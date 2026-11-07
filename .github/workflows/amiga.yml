@@ -19,7 +19,7 @@ jobs:
         run: docker run --rm -v "$PWD:/work" -w /work sacredbanana/amiga-compiler:m68k-amigaos make XGPlay
       - name: The Amiga program run in vamos (68k emulation of the AmigaOS Shell)
         run: |
-          pip install --break-system-packages amitools
+          pip install --break-system-packages amitools greenlet machine68k
           vamos --cpu 68020 XGPlay build/test.mid DUMP > build/amiga.txt
           diff build/host.txt build/amiga.txt && echo "XGPlay on 68020 = PC build: OK"
       - name: Package
