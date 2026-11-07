@@ -1,0 +1,11 @@
+[package]
+name = "refdump"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# The playback plan of the Rust core (XGWorks NextGen), for comparing with XGPlay DUMP.
+[dependencies]
+xgworks-core = { path = "../../../xgworks-core" }
+
+[workspace]

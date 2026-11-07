@@ -1,0 +1,34 @@
+name: Amiga build
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: PC build and the test song
+        run: |
+          make host
+          python3 tools/gen_test_mid.py build/test.mid
+          build/xgplay-host build/test.mid DUMP > build/host.txt
+          wc -l build/host.txt
+      - name: Amiga build (68020, amiga-gcc)
+        run: docker run --rm -v "$PWD:/work" -w /work sacredbanana/amiga-compiler:m68k-amigaos make XGPlay
+      - name: The Amiga program run in vamos (68k emulation of the AmigaOS Shell)
+        run: |
+          pip install --break-system-packages amitools
+          vamos --cpu 68020 XGPlay build/test.mid DUMP > build/amiga.txt
+          diff build/host.txt build/amiga.txt && echo "XGPlay on 68020 = PC build: OK"
+      - name: Package
+        run: |
+          mkdir -p "out/XGWorks Lite"
+          cp XGPlay "out/XGWorks Lite/"
+          cp docs/ReadMe.txt "out/XGWorks Lite/ReadMe"
+          cd out && zip -r ../XGWorksLite-amiga.zip "XGWorks Lite"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: XGWorksLite-amiga
+          path: XGWorksLite-amiga.zip

@@ -1,0 +1,5 @@
+build/
+XGPlay
+tools/refdump/target/
+*.obj
+*.exe
