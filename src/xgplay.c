@@ -4,7 +4,8 @@
  *   XGPlay FILE/A,RESET/K,DEVICE/K,UNIT/K/N,DUMP/S,QUIET/S
  *
  *   RESET=XG|GM|GS|OFF  a System On before the song (default OFF: the song's own)
- *   DEVICE / UNIT       the serial device (default serial.device unit 0)
+ *   DEVICE / UNIT       the serial device (default serial.device unit 0), or
+ *                       DEVICE=CAMD (camd.library, link out.<UNIT>)
  *   DUMP                print the messages with their times instead of playing
  *
  * Ctrl+C stops; every channel gets All Sound Off / Reset All Controllers.
@@ -21,7 +22,7 @@
 #include <dos/rdargs.h>
 #include <proto/exec.h>
 #include <proto/dos.h>
-static const char version[] = "$VER: XGPlay 0.1 (07.11.2026) XGWorks Lite";
+static const char version[] = "$VER: XGPlay 0.2 (07.11.2026) XGWorks Lite";
 #endif
 
 static const uint8_t XG_ON[] = {0xF0, 0x43, 0x10, 0x4C, 0x00, 0x00, 0x7E, 0x00, 0xF7};
@@ -76,14 +77,10 @@ static void dump(const XgSong *s, const uint8_t *reset, uint32_t rlen)
 
 static void all_off(void)
 {
-    uint8_t m[3];
-    int c;
-    for (c = 0; c < 16; c++) {
-        m[0] = (uint8_t)(0xB0 | c);
-        m[1] = 0x78; m[2] = 0; mo_put(m, 3);   /* All Sound Off */
-        m[1] = 0x79; mo_put(m, 3);             /* Reset All Controllers */
-        m[1] = 0x7B; mo_put(m, 3);             /* All Notes Off */
-    }
+    static const uint8_t ctl[3][2] = {{0x78, 0}, {0x79, 0}, {0x7B, 0}};  /* All Sound Off, Reset All Controllers, All Notes Off */
+    int c, k;
+    for (c = 0; c < 16; c++)
+        for (k = 0; k < 3; k++) mo_msg((uint8_t)(0xB0 | c), ctl[k], 2);
     mo_flush();
 }
 
@@ -98,7 +95,7 @@ static int play(const XgSong *s, const Opts *o, const uint8_t *reset, uint32_t r
         return 20;
     }
     if (reset) {
-        mo_put(reset, rlen);
+        mo_msg(reset[0], reset + 1, rlen - 1);
         mo_flush();
         start_us = 200000;  /* the module needs a moment after a System On */
     }
@@ -110,8 +107,8 @@ static int play(const XgSong *s, const Opts *o, const uint8_t *reset, uint32_t r
         while (i < s->nev && xg_tick_us(s, s->ev[i].tick) <= t) {
             const XgEv *e = &s->ev[i++];
             const uint8_t *b = ev_bytes(s, e, &n);
-            if (!e->n) mo_put(&e->msg[0], 1);
-            mo_put(b, n);
+            if (e->n) mo_msg(b[0], b + 1, n - 1);
+            else mo_msg(e->msg[0], b, n);
         }
         mo_flush();
         if (!o->quiet && t / 1000000 != last_s) {
@@ -192,9 +189,10 @@ int main(void)
 /* PC build: XGPlay <file> [RESET=XG|GM|GS|OFF] DUMP */
 int mo_open(const char *d, long u, char *m, int n) { (void)d; (void)u; snprintf(m, n, "the PC build has no MIDI output (use DUMP)"); return 0; }
 void mo_close(void) {}
-void mo_put(const uint8_t *b, uint32_t n) { (void)b; (void)n; }
+void mo_msg(uint8_t st, const uint8_t *b, uint32_t n) { (void)st; (void)b; (void)n; }
 void mo_flush(void) {}
 void mo_clock_start(void) {}
+uint32_t mo_now_us(void) { return 0; }
 int mo_wait_until(uint32_t us) { (void)us; return 1; }
 
 int main(int argc, char **argv)
