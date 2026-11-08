@@ -4,7 +4,7 @@
 # PC build for the tests:
 #   make host       -> build/xgplay-host
 CC      ?= m68k-amigaos-gcc
-CFLAGS  = -m68020 -O2 -noixemul -Wall -fomit-frame-pointer
+CFLAGS  = -m68020 -O2 -noixemul -Wall -Wno-pointer-sign -fomit-frame-pointer
 SRC     = src/xgplay.c src/smf.c
 HOSTCC  ?= cc
 

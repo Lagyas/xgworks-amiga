@@ -7,6 +7,8 @@
 #include <intuition/gadgetclass.h>
 #include <libraries/gadtools.h>
 #include <graphics/text.h>
+#include <dos/dos.h>
+#include <clib/alib_protos.h>
 #include <proto/exec.h>
 #include <proto/intuition.h>
 #include <proto/gadtools.h>
