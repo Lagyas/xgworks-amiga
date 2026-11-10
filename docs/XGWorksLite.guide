@@ -15,6 +15,8 @@
    @{" The mixer             " link Mixer}
    @{" Effects               " link Effects}
    @{" Lyrics and chords     " link Lyrics}
+   @{" Tracks                " link Tracks}
+   @{" Event List            " link Events}
    @{" XGworks songs (.XWS)  " link XWS}
    @{" MIDI output           " link Output}
    @{" XGPlay (Shell)        " link XGPlay}
@@ -56,6 +58,7 @@ previous / next song. At the end of a song the next one starts.
   @{b}Folder...@{ub}   another folder of songs
   @{b}Mixer...@{ub}    the @{"mixer" link Mixer}
   @{b}Lyrics...@{ub}   the @{"karaoke window" link Lyrics}
+  @{b}Tracks...@{ub}   the @{"tracks of the song" link Tracks} and their @{"events" link Events}
 
   @{b}Position@{ub}    drag to move in the song; what the song sets before that
               point (sounds, levels, effects) is sent first
@@ -119,6 +122,53 @@ Keys:
   Esc     close
 
 Song texts in Windows-1250 or UTF-8 are converted.
+@endnode
+
+@node Tracks "Tracks"
+The tracks of the song: number, name, MIDI channel, number of notes, M
+(mute) and S (solo).
+
+  @{b}Name@{ub}, @{b}Ch@{ub}    the name and the channel of the selected track (Return
+                 changes it; the channel moves all its channel messages)
+  @{b}M@{ub} / @{b}S@{ub}         mute / solo the track (its notes are not played)
+  @{b}Events...@{ub}     the @{"Event List" link Events} of the track
+  @{b}New@{ub}           a new empty track after the selected one
+  @{b}Delete@{ub}        delete the selected track
+  @{b}Undo@{ub}          undo the last change (up to 12)
+  @{b}Save@{ub}          write the song (the first save keeps <name>.bak)
+  @{b}Save as...@{ub}    write it as another file
+
+Every change is heard at once: the song is made again from the edited
+tracks (playing stops). The mixer's changes stay.
+@endnode
+
+@node Events "Event List"
+All events of a track, one per line:
+
+  0012:1:000  1  Note      C3   100   480
+  position    ch kind      values
+
+Click a line to select it; it is copied into the edit line below. Change
+the line and press Return (or @{b}Apply@{ub}) to replace the event, Shift+Return
+(or @{b}Insert@{ub}) to add it as a new event. Del or @{b}Delete@{ub} deletes the selected
+event; Cursor up / down (with Shift: a page) moves.
+
+The kinds and their values:
+
+  Note       key (C3 = 60, F#4, or a number), velocity, length in ticks
+  NoteOff    key, velocity          PolyPress  key, value
+  Ctrl       number, value          Prog       1 - 128
+  ChPress    value                  Pitch      -8192 .. 8191
+  SysEx      hex bytes, F0 ... F7
+  Tempo      BPM (e.g. 120.5)       TimeSig    e.g. 3/4
+  Text, Lyric, Marker, Name, Cue, Copyright, Instrument   "text"
+             (\r and \n are line / page ends, \xHH a byte the letters
+             of the window cannot show)
+  Chord      an XF chord: Am7, C/E, Gsus4, N.C.
+  Meta       type and hex data
+
+The position is bar:beat:tick (by the song's time signatures); the
+channel may be left out (the track's channel is taken).
 @endnode
 
 @node XWS "XGworks songs (.XWS)"

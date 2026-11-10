@@ -128,7 +128,7 @@ char *et_format(const EdSong *s, const EdEv *e, char *out, int max, int letters)
                 o += sprintf(esc + o, "\\x%02X", c);
             }
             esc[o] = 0;
-            snprintf(body, sizeof body, "%-9s \"%s\"", mn, esc);
+            snprintf(body, sizeof body, "%-9s \"%.180s\"", mn, esc);
         } else {
             uint32_t i;
             int n = snprintf(body, sizeof body, "Meta      %02X", e->d1);

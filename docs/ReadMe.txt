@@ -43,6 +43,11 @@ XGWorksLite - the window
              ISO-8859-2 (Czech / Polish ... with a Central European font)
              or Latin-1. Song texts in Windows-1250 or UTF-8 are converted.
 
+  Tracks...  the tracks: name, channel, mute / solo, new / delete, Undo,
+             Save, Save as; Events... opens the Event List of a track: every
+             event as a line (0012:1:000  1  Note  C3  100  480) - change the
+             line and press Return, Shift+Return inserts, Del deletes.
+
   With MUI installed the window is an MUI window; otherwise (or with CLASSIC)
   the classic GadTools window, which needs nothing extra. Keys in the classic
   window: P or Space = play, S = stop, Esc = quit.
