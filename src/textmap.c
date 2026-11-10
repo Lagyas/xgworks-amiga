@@ -67,3 +67,19 @@ size_t tm_convert(const uint8_t *in, size_t n, char *out, size_t max, int letter
     out[o] = 0;
     return o;
 }
+
+size_t tm_to_cp1250(const char *in, uint8_t *out, size_t max, int letters)
+{
+    size_t o = 0;
+    for (; *in && o < max; in++) {
+        uint8_t b = (uint8_t)*in;
+        uint32_t u = b;
+        int k;
+        if (b < 0x80) { out[o++] = b; continue; }
+        if (letters == TM_LATIN2 && b >= 0xA0) u = tm_latin2[b - 0xA0];
+        for (k = 0; k < 128; k++)
+            if (tm_cp1250[k] == u) break;
+        out[o++] = k < 128 ? (uint8_t)(0x80 + k) : (uint8_t)'?';
+    }
+    return o;
+}

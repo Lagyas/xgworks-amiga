@@ -37,6 +37,8 @@ int  mx_filter_sysex(const Mixer *m, const uint8_t *data, uint32_t len);
 int  mx_setup(const Mixer *m, uint8_t out[][3], int max);
 /* The user's effect settings as SysEx (F0 … F7, length in len[]); returns the count. */
 int  mx_setup_sysex(const Mixer *m, uint8_t out[][16], int len[], int max);
+/* After the song changed: the user's values (touched), mute / solo and effects of `old` kept. */
+void mx_keep_user(Mixer *m, const Mixer *old);
 /* The song with the user's values written in (NULL = no memory). */
 uint8_t *mx_save(const Mixer *m, const XgSong *s, size_t *out_size);
 

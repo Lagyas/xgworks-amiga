@@ -18,6 +18,7 @@ typedef struct {
     long unit;
     /* may change while playing */
     const Mixer *mixer;        /* NULL = the song as it is */
+    volatile uint8_t tmute[64];/* tracks not heard (their notes are left out) */
     volatile int tempo;        /* percent, 25..400 */
     volatile int transpose;    /* half-tones, notes of every channel but 10 */
     /* set by the player */

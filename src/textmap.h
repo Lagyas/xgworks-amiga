@@ -18,5 +18,8 @@ enum { TM_ASCII = 0, TM_LATIN2 = 1, TM_LATIN1 = 2 };
  * Windows-1250) written for the Amiga into `out` (zero-ended); CR / LF are
  * kept. Returns the length. */
 size_t tm_convert(const uint8_t *in, size_t n, char *out, size_t max, int letters);
+/* Text typed on the Amiga (letters: how it is written) as Windows-1250 for
+ * the song; returns the length. */
+size_t tm_to_cp1250(const char *in, uint8_t *out, size_t max, int letters);
 
 #endif

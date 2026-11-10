@@ -202,6 +202,13 @@ void app_mix_reset(App *a)
     }
 }
 
+static void drop_undo(App *a)
+{
+    int i;
+    for (i = 0; i < UNDOS; i++) ed_free(&a->undo[i]);
+    a->nundo = a->undo_top = 0;
+}
+
 static void unload(App *a)
 {
     app_stop(a);
@@ -209,7 +216,11 @@ static void unload(App *a)
         ly_free(&a->ly);
         xg_smf_free(&a->song);
         free(a->data);
+        ed_free(&a->ed);
+        drop_undo(a);
     }
+    a->dirty = 0;
+    a->path_as[0] = 0;
     a->data = NULL;
     a->cur = -1;
     a->len_us = 0;
@@ -275,6 +286,7 @@ int app_load(App *a, int k)
     }
     a->data = data;
     a->cur = k;
+    if (!ed_load(&a->ed, data, (size_t)size)) memset(&a->ed, 0, sizeof a->ed);
     mx_from_song(&a->mx, &a->song);
     ly_build(&a->ly, &a->song, a->letters);
     a->len_us = a->song.nev ? xg_tick_us(&a->song, a->song.ev[a->song.nev - 1].tick) : 0;
@@ -345,6 +357,70 @@ static int write_file(const char *path, const uint8_t *b, size_t n)
     return w == (LONG)n;
 }
 
+/* ---- editing ---- */
+
+void app_ed_begin(App *a)
+{
+    EdSong *u = &a->undo[a->undo_top];
+    ed_free(u);
+    if (!ed_copy(u, &a->ed)) return;
+    a->undo_top = (a->undo_top + 1) % UNDOS;
+    if (a->nundo < UNDOS) a->nundo++;
+}
+
+/* The song made again from a->ed; the user's mixer values stay. */
+static int rebuild(App *a)
+{
+    size_t n;
+    uint8_t *nb = ed_save(&a->ed, &n);
+    XgSong ns;
+    Mixer keep = a->mx;
+    if (!nb) { snprintf(a->info, sizeof a->info, "Not enough memory."); return 0; }
+    if (xg_smf_load(&ns, nb, n) != XG_OK) { free(nb); snprintf(a->info, sizeof a->info, "The edited song cannot be read."); return 0; }
+    app_stop(a);
+    ly_free(&a->ly);
+    xg_smf_free(&a->song);
+    free(a->data);
+    a->data = nb;
+    a->song = ns;
+    a->len_us = ns.nev ? xg_tick_us(&ns, ns.ev[ns.nev - 1].tick) : 0;
+    mx_from_song(&a->mx, &a->song);
+    mx_keep_user(&a->mx, &keep);
+    ly_build(&a->ly, &a->song, a->letters);
+    app_track_mute(a);
+    return 1;
+}
+
+int app_ed_commit(App *a)
+{
+    if (a->cur < 0) return 0;
+    a->dirty = 1;
+    return rebuild(a);
+}
+
+int app_undo(App *a)
+{
+    int i;
+    if (!a->nundo) { snprintf(a->info, sizeof a->info, "Nothing to undo."); return 0; }
+    i = (a->undo_top + UNDOS - 1) % UNDOS;
+    ed_free(&a->ed);
+    a->ed = a->undo[i];
+    memset(&a->undo[i], 0, sizeof a->undo[i]);
+    a->undo_top = i;
+    a->nundo--;
+    snprintf(a->info, sizeof a->info, "Undone (%d more).", a->nundo);
+    return rebuild(a);
+}
+
+void app_track_mute(App *a)
+{
+    uint32_t t;
+    int solo = 0;
+    for (t = 0; t < a->ed.ntrk; t++) solo |= a->ed.trk[t].solo;
+    for (t = 0; t < 64; t++)
+        a->pl.tmute[t] = (uint8_t)(t < a->ed.ntrk && (a->ed.trk[t].mute || (solo && !a->ed.trk[t].solo)));
+}
+
 int app_save(App *a)
 {
     char path[512], bak[520];
@@ -353,8 +429,8 @@ int app_save(App *a)
     int k = a->cur;
     BPTR l;
     if (k < 0) return 0;
-    if (!mx_any_touched(&a->mx)) {
-        snprintf(a->info, sizeof a->info, "Nothing changed in the mixer.");
+    if (!mx_any_touched(&a->mx) && !a->dirty) {
+        snprintf(a->info, sizeof a->info, "Nothing changed.");
         return 0;
     }
     app_stop(a);
@@ -365,7 +441,8 @@ int app_save(App *a)
     strncpy(path, a->folder, sizeof path - 1);
     path[sizeof path - 1] = 0;
     AddPart((STRPTR)path, (CONST_STRPTR)a->names[k], sizeof path);
-    if (a->is_xws) {
+    if (a->path_as[0]) strcpy(path, a->path_as);
+    else if (a->is_xws) {
         /* an .XWS is kept as it is: the song goes into <name>.mid next to it */
         char *dot = strrchr(path, '.');
         if (dot && strlen(dot) == 4) strcpy(dot, ".mid");
@@ -373,24 +450,43 @@ int app_save(App *a)
     /* the first save keeps the original as .bak */
     snprintf(bak, sizeof bak, "%s.bak", path);
     if ((l = Lock((CONST_STRPTR)bak, ACCESS_READ))) UnLock(l);
-    else if (!a->is_xws) write_file(bak, a->data, a->song.size);
+    else if (!a->is_xws && !a->path_as[0] && (l = Lock((CONST_STRPTR)path, ACCESS_READ))) {
+        /* the file as it is on the disk (not the edited song) */
+        BPTR fh;
+        UnLock(l);
+        if ((fh = Open((CONST_STRPTR)path, MODE_OLDFILE))) {
+            LONG sz;
+            uint8_t *old;
+            Seek(fh, 0, OFFSET_END);
+            sz = Seek(fh, 0, OFFSET_BEGINNING);
+            if (sz > 0 && (old = (uint8_t *)malloc((size_t)sz))) {
+                if (Read(fh, old, sz) == sz) write_file(bak, old, (size_t)sz);
+                free(old);
+            }
+            Close(fh);
+        }
+    }
     if (!write_file(path, nb, n)) {
         free(nb);
         snprintf(a->info, sizeof a->info, "%s cannot be written.", a->names[k]);
         return 0;
     }
     free(nb);
-    if (a->is_xws) {
-        char *n = strrchr(path, '/'), *c = strrchr(path, ':');
-        const char *base = n ? n + 1 : c ? c + 1 : path;
-        char saved[120];
-        strncpy(saved, base, sizeof saved - 1);
+    a->dirty = 0;
+    if (a->is_xws || a->path_as[0]) {
+        /* a new file: its folder is listed and the song taken from there */
+        char saved[120], folder[256];
+        int was_xws = a->is_xws && !a->path_as[0];
+        strncpy(saved, (const char *)FilePart((STRPTR)path), sizeof saved - 1);
         saved[sizeof saved - 1] = 0;
-        app_scan(a, a->folder);
+        strncpy(folder, path, sizeof folder - 1);
+        folder[sizeof folder - 1] = 0;
+        *PathPart((STRPTR)folder) = 0;
+        app_scan(a, folder);
         for (k = 0; k < a->count; k++)
             if (!ci_cmp(a->names[k], saved)) break;
         if (k >= a->count || !app_load(a, k)) return 0;
-        snprintf(a->info, sizeof a->info, "Saved as %s (the .XWS is unchanged).", saved);
+        snprintf(a->info, sizeof a->info, was_xws ? "Saved as %s (the .XWS is unchanged)." : "Saved as %s.", saved);
         return 1;
     }
     {
@@ -402,6 +498,32 @@ int app_save(App *a)
     }
     snprintf(a->info, sizeof a->info, "%s saved (the old one: .bak).", a->names[k]);
     return 1;
+}
+
+int app_save_as(App *a, void *window)
+{
+    struct FileRequester *fr;
+    char path[256];
+    int ok = 0;
+    if (a->cur < 0 || !AslBase) return 0;
+    fr = (struct FileRequester *)AllocAslRequestTags(ASL_FileRequest,
+        ASLFR_TitleText, (ULONG)"Save the song as", ASLFR_DoSaveMode, TRUE,
+        ASLFR_InitialDrawer, (ULONG)a->folder, ASLFR_InitialFile, (ULONG)a->names[a->cur],
+        window ? ASLFR_Window : TAG_IGNORE, (ULONG)window, TAG_DONE);
+    if (!fr) return 0;
+    if (AslRequest(fr, NULL) && fr->fr_File && fr->fr_File[0]) {
+        char *dot;
+        strncpy(path, (const char *)fr->fr_Drawer, sizeof path - 1);
+        path[sizeof path - 1] = 0;
+        AddPart((STRPTR)path, (CONST_STRPTR)fr->fr_File, sizeof path);
+        /* an .XWS name gets .mid: the song is written as MIDI */
+        if ((dot = strrchr(path, '.')) && !ci_cmp(dot, ".xws")) strcpy(dot, ".mid");
+        strcpy(a->path_as, path);
+        a->dirty = 1;
+        ok = app_save(a);
+    }
+    FreeAslRequest(fr);
+    return ok;
 }
 
 void app_set_letters(App *a, int letters)

@@ -61,6 +61,7 @@ static void send(const Player *p, const XgSong *s, const XgEv *e, int transpose)
         if (k < 0 || k > 127) return;
         m[1] = (uint8_t)k;
     }
+    if (e->trk < 64 && p->tmute[e->trk] && (m[0] & 0xF0) == 0x90 && m[2]) return;
     if (p->mixer && !mx_filter(p->mixer, m, e->n, out)) return;
     mo_msg(p->mixer ? out[0] : m[0], p->mixer ? out + 1 : m + 1, e->n - 1u);
 }

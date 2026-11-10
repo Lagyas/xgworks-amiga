@@ -11,6 +11,7 @@
 #include "gui.h"
 #include "mixwin.h"
 #include "karawin.h"
+#include "edwin.h"
 
 struct Library *MUIMasterBase;
 
@@ -18,10 +19,10 @@ struct Library *MUIMasterBase;
 #define MAKE_ID(a, b, c, d) ((ULONG)(a) << 24 | (ULONG)(b) << 16 | (ULONG)(c) << 8 | (ULONG)(d))
 #endif
 
-enum { ID_PLAY = 1, ID_STOP, ID_PREV, ID_NEXT, ID_OPEN, ID_FOLDER, ID_LIST, ID_POS, ID_TEMPO, ID_TRANS, ID_RESET, ID_OUT, ID_MIX, ID_LYR };
+enum { ID_PLAY = 1, ID_STOP, ID_PREV, ID_NEXT, ID_OPEN, ID_FOLDER, ID_LIST, ID_POS, ID_TEMPO, ID_TRANS, ID_RESET, ID_OUT, ID_MIX, ID_LYR, ID_TRK };
 
 static Object *app, *win, *list, *spos, *ttime, *stempo, *strans, *creset, *cout, *tinfo, *lv;
-static Object *bprev, *bplay, *bstop, *bnext, *bopen, *bdir, *bmix, *blyr;
+static Object *bprev, *bplay, *bstop, *bnext, *bopen, *bdir, *bmix, *blyr, *btrk;
 
 static ULONG getv(Object *o, ULONG attr)
 {
@@ -59,6 +60,7 @@ static void start(App *a, int k, uint32_t from)
     if (k < 0) return;
     if (k != a->cur && !app_load(a, k)) { show(a); return; }
     mixmui_refresh(a);
+    edw_refresh(a);
     kw_update(a, from, 1);
     SetAttrs(spos, MUIA_NoNotify, TRUE, MUIA_Numeric_Max, a->len_us / 1000000 + 1, MUIA_Numeric_Value, from / 1000000, TAG_DONE);
     SetAttrs(list, MUIA_NoNotify, TRUE, MUIA_List_Active, k, TAG_DONE);
@@ -98,6 +100,7 @@ int gui_mui(App *a)
                     Child, HSpace(0),
                     Child, bmix = SimpleButton("_Mixer..."),
                     Child, blyr = SimpleButton("_Lyrics..."),
+                    Child, btrk = SimpleButton("_Tracks..."),
                     Child, bopen = SimpleButton("_Open..."),
                     Child, bdir = SimpleButton("_Folder..."),
                 End,
@@ -128,11 +131,11 @@ int gui_mui(App *a)
         return -1;
     }
     {
-        Object *const btn[8] = {bprev, bplay, bstop, bnext, bopen, bdir, bmix, blyr};
-        static const ULONG ids[8] = {ID_PREV, ID_PLAY, ID_STOP, ID_NEXT, ID_OPEN, ID_FOLDER, ID_MIX, ID_LYR};
+        Object *const btn[9] = {bprev, bplay, bstop, bnext, bopen, bdir, bmix, blyr, btrk};
+        static const ULONG ids[9] = {ID_PREV, ID_PLAY, ID_STOP, ID_NEXT, ID_OPEN, ID_FOLDER, ID_MIX, ID_LYR, ID_TRK};
         int k;
         mixmui_create(a, app);
-        for (k = 0; k < 8; k++) DoMethod(btn[k], MUIM_Notify, MUIA_Pressed, FALSE, (ULONG)app, 2, MUIM_Application_ReturnID, ids[k]);
+        for (k = 0; k < 9; k++) DoMethod(btn[k], MUIM_Notify, MUIA_Pressed, FALSE, (ULONG)app, 2, MUIM_Application_ReturnID, ids[k]);
     }
     DoMethod(win, MUIM_Notify, MUIA_Window_CloseRequest, TRUE, (ULONG)app, 2, MUIM_Application_ReturnID, MUIV_Application_ReturnID_Quit);
     DoMethod(lv, MUIM_Notify, MUIA_Listview_DoubleClick, TRUE, (ULONG)app, 2, MUIM_Application_ReturnID, ID_LIST);
@@ -205,6 +208,10 @@ int gui_mui(App *a)
         case ID_LYR:
             kw_open(a);
             break;
+        case ID_TRK:
+            edw_tracks_open(a);
+            show(a);
+            break;
         default:
             if (mixmui_handle(a, id)) {
                 if (a->cur >= 0) SetAttrs(spos, MUIA_NoNotify, TRUE, MUIA_Numeric_Max, a->len_us / 1000000 + 1, TAG_DONE);
@@ -213,7 +220,18 @@ int gui_mui(App *a)
             break;
         }
         if (running && sigs) {
-            sigs = Wait(sigs | pl_signal() | kw_signal() | SIGBREAKF_CTRL_C);
+            sigs = Wait(sigs | pl_signal() | kw_signal() | edw_signal() | SIGBREAKF_CTRL_C);
+            if (sigs & edw_signal()) {
+                if (edw_handle(a)) {
+                    mixmui_refresh(a);
+                    if (a->cur >= 0) {
+                        SetAttrs(spos, MUIA_NoNotify, TRUE, MUIA_Numeric_Max, a->len_us / 1000000 + 1, TAG_DONE);
+                        SetAttrs(list, MUIA_NoNotify, TRUE, MUIA_List_Active, a->cur, TAG_DONE);
+                    }
+                    kw_update(a, 0, 1);
+                }
+                show(a);
+            }
             if (sigs & SIGBREAKF_CTRL_C) running = 0;
             if (sigs & kw_signal()) kw_handle(a, app_playing(a) ? a->pl.pos_us : getv(spos, MUIA_Numeric_Value) * 1000000UL);
             if (sigs & pl_signal()) {
@@ -222,10 +240,12 @@ int gui_mui(App *a)
             }
             sigs &= ~(pl_signal() | SIGBREAKF_CTRL_C);
             if (kw_is_open() || (sigs & kw_signal())) sigs &= ~kw_signal();
+            sigs &= ~edw_signal();
         }
     }
     app_stop(a);
     kw_close();
+    edw_close_all();
     SetAttrs(win, MUIA_Window_Open, FALSE, TAG_DONE);
     MUI_DisposeObject(app);
     CloseLibrary(MUIMasterBase);

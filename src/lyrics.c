@@ -153,3 +153,40 @@ long ly_chord_at(const Lyrics *ly, uint32_t tick)
     }
     return lo - 1;
 }
+
+static int root_byte(const char *s, int *used)
+{
+    static const char L[] = "CDEFGAB";
+    const char *x;
+    int f = 3, n;
+    char c = *s >= 'a' && *s <= 'g' ? (char)(*s - 32) : *s;
+    if (!c || !(x = strchr(L, c))) return -1;
+    n = (int)(x - L) + 1;
+    *used = 1;
+    if (s[1] == '#') { f = 4; (*used)++; if (s[2] == '#') { f = 5; (*used)++; } }
+    else if (s[1] == 'b') { f = 2; (*used)++; if (s[2] == 'b') { f = 1; (*used)++; } }
+    return (f << 4) | n;
+}
+
+int ly_chord_data(const char *name, uint8_t *d)
+{
+    char main_[24], *slash;
+    int r, used, t;
+    d[0] = 0x43; d[1] = 0x7B; d[2] = 0x01;
+    if (!strcmp(name, "N.C.") || !strcmp(name, "NC")) { d[3] = 0x7F; d[4] = 0; d[5] = 0x7F; d[6] = 0x7F; return 1; }
+    strncpy(main_, name, sizeof main_ - 1);
+    main_[sizeof main_ - 1] = 0;
+    d[5] = 0x7F; d[6] = 0x7F;
+    if ((slash = strchr(main_, '/'))) {
+        int b, u2;
+        *slash = 0;
+        if ((b = root_byte(slash + 1, &u2)) < 0 || slash[1 + u2]) return 0;
+        d[5] = (uint8_t)b; d[6] = 0;
+    }
+    if ((r = root_byte(main_, &used)) < 0) return 0;
+    for (t = 0; t < 34; t++)
+        if (!strcmp(main_ + used, XF_TYPES[t])) break;
+    if (t == 34) return 0;
+    d[3] = (uint8_t)r; d[4] = (uint8_t)t;
+    return 1;
+}

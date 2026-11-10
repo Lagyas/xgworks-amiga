@@ -8,6 +8,9 @@
 #include "player.h"
 #include "mixer.h"
 #include "lyrics.h"
+#include "edit.h"
+
+#define UNDOS 12
 
 #define RESETS 4   /* Off, XG, GM, GS */
 #define OUTPUTS 2  /* serial.device, CAMD */
@@ -33,6 +36,11 @@ typedef struct {
     int letters;           /* TM_ASCII, TM_LATIN2, TM_LATIN1 */
     int kfont;             /* karaoke text size */
     int is_xws;            /* the loaded song is an .XWS (saved as .mid) */
+    EdSong ed;             /* the song as it is edited */
+    EdSong undo[UNDOS];    /* before the last edits (ring) */
+    int nundo, undo_top;
+    int dirty;             /* edited since loaded / saved */
+    char path_as[256];     /* Save as: the file the song now belongs to ("" = its own) */
 } App;
 
 extern const char *const app_reset_names[RESETS + 1];
@@ -62,6 +70,15 @@ void app_mix_reset(App *a);
 void app_fx(App *a, int what, int value);
 /* Write the mixer's values into the song file (song.mid.bak keeps the old one). */
 int  app_save(App *a);
+/* Save as another file (ASL requester); the song belongs to it from then on. */
+int  app_save_as(App *a, void *window);
+/* Editing: app_ed_begin before a change of a->ed (for Undo), app_ed_commit
+ * after it (the player, mixer and lyrics take the new song; playing stops). */
+void app_ed_begin(App *a);
+int  app_ed_commit(App *a);
+int  app_undo(App *a);
+/* Track mute / solo into the player. */
+void app_track_mute(App *a);
 /* How lyrics are written: plain letters, ISO-8859-2 or Latin-1 (rebuilds them). */
 void app_set_letters(App *a, int letters);
 void app_set_tempo(App *a, int pct);

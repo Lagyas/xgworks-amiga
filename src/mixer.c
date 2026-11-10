@@ -276,3 +276,19 @@ uint8_t *mx_save(const Mixer *m, const XgSong *s, size_t *out_size)
     free(copy);
     return res;
 }
+
+void mx_keep_user(Mixer *m, const Mixer *old)
+{
+    int c, p;
+    for (c = 0; c < 16; c++) {
+        for (p = 0; p < MX_N; p++)
+            if (old->touched[c][p]) { m->val[c][p] = old->val[c][p]; m->touched[c][p] = 1; }
+        m->mute[c] = old->mute[c];
+        m->solo[c] = old->solo[c];
+    }
+    for (p = 0; p < FX_N; p++)
+        if (old->fx.touched[p]) {
+            m->fx.touched[p] = 1;
+            if (p < 2) m->fx.sel[p] = old->fx.sel[p]; else m->fx.ret[p - 2] = old->fx.ret[p - 2];
+        }
+}

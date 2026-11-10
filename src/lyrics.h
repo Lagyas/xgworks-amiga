@@ -42,5 +42,7 @@ long ly_syl_at(const Lyrics *ly, uint32_t tick);
 long ly_chord_at(const Lyrics *ly, uint32_t tick);
 /* XF chord data (7 bytes: 43 7B 01 cr ct bn bt) as a name ("Am7", "C/E", "N.C."). */
 void ly_chord_name(const uint8_t *d, char *out);
+/* A chord name into XF chord data (7 bytes); 0 = not a chord. */
+int  ly_chord_data(const char *name, uint8_t *d);
 
 #endif
