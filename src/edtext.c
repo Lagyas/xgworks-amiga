@@ -62,7 +62,7 @@ static const char *meta_name(int t)
 
 char *et_format(const EdSong *s, const EdEv *e, char *out, int max, int letters)
 {
-    char pos[24], ch[4], body[200];
+    char pos[48], ch[4], body[200];
     uint32_t bar, beat, t;
     int k = e->st & 0xF0;
     ed_mbt(s, e->tick, &bar, &beat, &t);
@@ -98,7 +98,7 @@ char *et_format(const EdSong *s, const EdEv *e, char *out, int max, int letters)
         const char *mn = meta_name(e->d1);
         if (e->d1 == 0x51 && e->len == 3) {
             uint32_t us = ((uint32_t)d[0] << 16) | ((uint32_t)d[1] << 8) | d[2];
-            uint32_t bpm100 = us ? (uint32_t)(6000000000.0 / us + 0.5) : 0;
+            uint32_t bpm100 = us ? (uint32_t)((6000000000ULL + us / 2) / us) : 0;
             snprintf(body, sizeof body, "Tempo     %lu.%02lu  (%lu us)", (unsigned long)(bpm100 / 100), (unsigned long)(bpm100 % 100), (unsigned long)us);
         } else if (e->d1 == 0x58 && e->len >= 2) {
             snprintf(body, sizeof body, "TimeSig   %d/%d", d[0], 1 << (d[1] > 6 ? 6 : d[1]));
@@ -135,7 +135,7 @@ char *et_format(const EdSong *s, const EdEv *e, char *out, int max, int letters)
             for (i = 0; i < e->len && n < (int)sizeof body - 4; i++) n += sprintf(body + n, " %02X", d[i]);
         }
     }
-    snprintf(out, (size_t)max, "%s %s  %s", pos, ch, body);
+    snprintf(out, (size_t)max, "%.20s %s  %.170s", pos, ch, body);
     return out;
 }
 
@@ -260,21 +260,28 @@ int et_parse(EdSong *s, const char *line, EdEv *e, int ch, int letters, char *er
         return 1;
     }
     if (ieq(kind, "Tempo")) {
-        double bpm;
+        /* BPM with up to two decimals, in hundredths (no floating point: the Amiga has no FPU) */
+        uint32_t bpm100 = 0, us;
         uint8_t d[3];
-        uint32_t us;
+        const char *q;
+        int dec = -1;
         word(&p, w, sizeof w);
-        bpm = atof(w);
-        if (bpm < 4 || bpm > 999) FAIL("Tempo in BPM, e.g. Tempo 120");
-        us = (uint32_t)(60000000.0 / bpm + 0.5);
+        for (q = w; *q; q++) {
+            if (*q == '.' || *q == ',') { if (dec >= 0) break; dec = 0; continue; }
+            if (*q < '0' || *q > '9') break;
+            if (dec < 0) bpm100 = bpm100 * 10 + (uint32_t)(*q - '0');
+            else if (dec < 2) { bpm100 = bpm100 * 10 + (uint32_t)(*q - '0'); dec++; }
+        }
+        if (dec < 0) dec = 0;
+        while (dec++ < 2) bpm100 *= 10;
+        if (*q || bpm100 < 400 || bpm100 > 99900) FAIL("Tempo in BPM, e.g. Tempo 120");
+        us = (uint32_t)((6000000000ULL + bpm100 / 2) / bpm100);
         /* the exact value, when it is there and fits the BPM: "(496689 us)" */
         {
-            const char *q = strchr(p, '(');
+            const char *r = strchr(p, '(');
             unsigned long x;
-            if (q && sscanf(q + 1, "%lu", &x) == 1 && x > 0 && x < 0x1000000UL) {
-                uint32_t b100 = (uint32_t)(6000000000.0 / x + 0.5), my = (uint32_t)(bpm * 100 + 0.5);
-                if (b100 == my) us = (uint32_t)x;
-            }
+            if (r && sscanf(r + 1, "%lu", &x) == 1 && x > 0 && x < 0x1000000UL &&
+                (uint32_t)((6000000000ULL + x / 2) / x) == bpm100) us = (uint32_t)x;
         }
         d[0] = (uint8_t)(us >> 16); d[1] = (uint8_t)(us >> 8); d[2] = (uint8_t)us;
         e->st = 0xFF; e->d1 = 0x51; e->len = 3;
