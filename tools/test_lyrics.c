@@ -21,7 +21,7 @@ int main(int argc, char **argv)
         if (!(f = fopen(argv[i], "rb"))) continue;
         fseek(f, 0, SEEK_END); n = ftell(f); fseek(f, 0, SEEK_SET);
         b = (uint8_t *)malloc((size_t)n);
-        fread(b, 1, (size_t)n, f);
+        if (fread(b, 1, (size_t)n, f) != (size_t)n) { fclose(f); free(b); continue; }
         fclose(f);
         if (xg_smf_load(&s, b, (size_t)n) != XG_OK || !ly_build(&ly, &s, letters)) { printf("%s: cannot read\n", argv[i]); continue; }
         printf("== %s: %lu syllables, %lu lines, %lu chords\n", argv[i], (unsigned long)ly.nsyl, (unsigned long)ly.nline, (unsigned long)ly.nchord);

@@ -29,11 +29,20 @@ XGWorksLite - the window
              first save keeps the old file as .bak). Undo goes back to the
              song's values.
 
+  Lyrics...  the karaoke window: the chord now (highlighted) and the next
+             ones, the line being sung with the sung part highlighted, and
+             the next line. Lyrics of XF songs (lyric events, "/" new line,
+             "<" new page) and of .kar files (text events) are read.
+             Keys: + / - text size (helvetica.font from FONTS:, else the
+             screen font), D the letters: plain (no diacritics, any font),
+             ISO-8859-2 (Czech / Polish ... with a Central European font)
+             or Latin-1. Song texts in Windows-1250 or UTF-8 are converted.
+
   With MUI installed the window is an MUI window; otherwise (or with CLASSIC)
   the classic GadTools window, which needs nothing extra. Keys in the classic
   window: P or Space = play, S = stop, Esc = quit.
 
-  The settings (folder, reset, output, tempo) are kept in
+  The settings (folder, reset, output, tempo, letters, text size) are kept in
   ENVARC:XGWorksLite.prefs. From Workbench the tool types FOLDER= and
   CLASSIC work the same.
 
