@@ -53,6 +53,13 @@ XGWorksLite - the window
              rectangle selects; grid, channel, velocity, zoom; Del, cursor
              keys, A (all), C (copy a bar later). Velocities under the notes.
 
+  Drums...   the Drum editor: a row per drum (GM names), a column per grid
+             step; a click puts / takes a hit; the drum name plays it.
+  Texts...   lyrics and chords: text onto notes (typed or a text file;
+             "-" syllables, "/" new line, "<" new page), chords onto bars,
+             chords -1 / +1, Midimusic export / import, no diacritics.
+             Single lyrics and chords: the Event List, Show Lyrics / Chords.
+
   With MUI installed the window is an MUI window; otherwise (or with CLASSIC)
   the classic GadTools window, which needs nothing extra. Keys in the classic
   window: P or Space = play, S = stop, Esc = quit.

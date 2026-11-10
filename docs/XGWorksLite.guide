@@ -18,6 +18,8 @@
    @{" Tracks                " link Tracks}
    @{" Event List            " link Events}
    @{" Piano Roll            " link Roll}
+   @{" Drum editor           " link Drums}
+   @{" Texts (lyrics, chords)" link Texts}
    @{" XGworks songs (.XWS)  " link XWS}
    @{" MIDI output           " link Output}
    @{" XGPlay (Shell)        " link XGPlay}
@@ -61,6 +63,8 @@ previous / next song. At the end of a song the next one starts.
   @{b}Lyrics...@{ub}   the @{"karaoke window" link Lyrics}
   @{b}Tracks...@{ub}   the @{"tracks of the song" link Tracks} and their @{"events" link Events}
   @{b}Roll...@{ub}     the @{"Piano Roll" link Roll} of the track selected in Tracks
+  @{b}Drums...@{ub}    the @{"Drum editor" link Drums}
+  @{b}Texts...@{ub}    the @{"lyrics and chord tools" link Texts}
 
   @{b}Position@{ub}    drag to move in the song; what the song sets before that
               point (sounds, levels, effects) is sent first
@@ -171,6 +175,11 @@ The kinds and their values:
 
 The position is bar:beat:tick (by the song's time signatures); the
 channel may be left out (the track's channel is taken).
+
+@{b}Show@{ub} (the cycle gadget) lists only some events: Notes, Controls (controllers,
+programs, pressure, pitch bend), Lyrics, Chords, Texts (text, marker, name,
+...), SysEx, Tempo (tempo and time signatures). So the lyrics or the chords
+of a song are edited one by one here.
 @endnode
 
 @node Roll "Piano Roll"
@@ -202,6 +211,42 @@ the key, and a note is heard when it is clicked or drawn.
 
 While the song plays the line shows the position and the view turns the
 pages. Every change is heard at once.
+@endnode
+
+@node Drums "Drum editor"
+One row per drum - the drums the track uses, or all General MIDI drums
+(@{b}Rows@{ub}) - and one column per step of the grid (bar numbers on top, the
+first beat of a bar in the fill colour). A click on a step puts a hit there
+or takes it away; new hits get the velocity @{b}Vel@{ub} (louder hits are drawn
+bigger). A click on a drum's name plays it.
+
+It opens on the track selected in Tracks, else the track with channel 10
+notes. @{b}Grid@{ub}: 1/4 ... 1/32 and triplets; @{b}Ch@{ub}: the channel (10 for GM drums);
+@{b}- / +@{ub}: the width of the steps; @{b}Undo@{ub}.
+@endnode
+
+@node Texts "Texts (lyrics and chords)"
+Tools for the lyrics and chords, as in XGWorks NextGen:
+
+  @{b}Text@{ub} / @{b}Onto notes@{ub}   the text is put on the notes from bar @{b}Bar@{ub}, one syllable
+        on each note start: words split at spaces, syllables at "-", "/"
+        starts a new line, "<" a new page. The old lyrics there are
+        replaced. The notes are those of the track selected in Tracks (else
+        the lyrics track, else the first track with notes).
+  @{b}Text file...@{ub}   the same from a text file (Windows-1250 or UTF-8): a line
+        end is a new line, an empty line a new page
+  @{b}Chords@{ub} / @{b}Onto bars@{ub}  chords such as "C G Am7 F/A" one on each bar, half bar
+        or beat from bar @{b}Bar@{ub} ("-" or "." keeps a step empty); the chords
+        there are replaced
+  @{b}Chords -1 / +1@{ub}   every chord a half-tone down / up
+  @{b}Export... / Import...@{ub}   the Midimusic Chord and Lyrics Protocol text
+        (Lyr / Chd lines with bar:beat:tick); @{b}Replace@{ub}: an import removes the
+        old lyrics / chords first
+  @{b}No diacritics@{ub}   lyrics and texts with plain letters only
+  @{b}Undo@{ub}
+
+Single syllables and chords are changed in the @{"Event List" link Events} with
+Show Lyrics / Chords; the karaoke window (@{"Lyrics" link Lyrics}) shows the result.
 @endnode
 
 @node XWS "XGworks songs (.XWS)"
