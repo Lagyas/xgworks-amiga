@@ -54,7 +54,7 @@ static int xp_of(int addr)
     return -1;
 }
 
-int mx_xp_msg(const Mixer *m, int ch, int p, uint8_t *o)
+int mx_xp_msg(const Mixer *m, int ch, int p, uint8_t o[16])
 {
     o[0] = 0xF0; o[1] = 0x43; o[2] = 0x10; o[3] = 0x4C; o[4] = 0x08; o[5] = (uint8_t)ch;
     o[6] = mx_xp[p].addr; o[7] = m->xp[ch][p]; o[8] = 0xF7;

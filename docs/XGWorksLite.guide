@@ -14,12 +14,16 @@
    @{" The main window       " link Main_Window}
    @{" The mixer             " link Mixer}
    @{" Effects               " link Effects}
+   @{" XGM part editor       " link XGM}
    @{" Lyrics and chords     " link Lyrics}
    @{" Tracks                " link Tracks}
    @{" Event List            " link Events}
    @{" Piano Roll            " link Roll}
    @{" Drum editor           " link Drums}
    @{" Texts (lyrics, chords)" link Texts}
+   @{" Lyrics editor         " link LyrEdit}
+   @{" Staff                 " link Staff}
+   @{" Sound names (XG4)     " link XG4}
    @{" XGworks songs (.XWS)  " link XWS}
    @{" MIDI output           " link Output}
    @{" XGPlay (Shell)        " link XGPlay}
@@ -60,6 +64,9 @@ previous / next song. At the end of a song the next one starts.
   @{b}Open...@{ub}     a song from any folder (its folder is shown then)
   @{b}Folder...@{ub}   another folder of songs
   @{b}Mixer...@{ub}    the @{"mixer" link Mixer}
+  @{b}XGM...@{ub}      the @{"XGM part editor" link XGM}: sounds by name, XG part parameters
+  @{b}Lyr.Edit...@{ub} the @{"Lyrics editor" link LyrEdit}, line by line
+  @{b}Staff...@{ub}    the @{"notation" link Staff} of a track
   @{b}Lyrics...@{ub}   the @{"karaoke window" link Lyrics}
   @{b}Tracks...@{ub}   the @{"tracks of the song" link Tracks} and their @{"events" link Events}
   @{b}Roll...@{ub}     the @{"Piano Roll" link Roll} of the track selected in Tracks
@@ -111,6 +118,24 @@ the return level. Which messages are used depends on the song:
 
 A song with a GS reset or GS effect messages is treated as GS, any other as
 XG. Changes are heard at once and saved into the song like the mixer's.
+@endnode
+
+@node XGM "XGM part editor"
+One part (@{b}Part 1-16@{ub}) at a time:
+
+  @{b}Sound@{ub}   the sound now (bank MSB / LSB / program and its name)
+  left list    the 128 programs, then SFX and the drum kits: a click sets
+               the program's main sound
+  right list   its variations (bank MSB / LSB and name), the SFX or the
+               drum kits: a click sets that sound
+  sliders      the XG part parameters: Note Shift, Variation Send,
+               Vibrato Rate / Depth / Delay, Cutoff, Resonance, Attack,
+               Decay, Release, Bend Range (0 = the sound's own)
+  @{b}Part parameters: default@{ub}   all sliders back to 0
+
+Everything is heard at once, also while playing, and saved into the song
+with the mixer's @{b}Save@{ub} (XG Multi Part messages: over the song's own, else
+new ones after its reset). The names come from the @{"XG4 voice lists" link XG4}.
 @endnode
 
 @node Lyrics "Lyrics and chords"
@@ -247,6 +272,41 @@ Tools for the lyrics and chords, as in XGWorks NextGen:
 
 Single syllables and chords are changed in the @{"Event List" link Events} with
 Show Lyrics / Chords; the karaoke window (@{"Lyrics" link Lyrics}) shows the result.
+@endnode
+
+@node LyrEdit "Lyrics editor"
+The song's lyrics line by line (as the karaoke window shows them), with the
+bar where each line starts. Click a line: its text comes into the edit line.
+Change it and press Return (or @{b}Apply@{ub}):
+
+  - with the same number of syllables they keep their times
+  - with more or fewer they go onto the notes of the line (up to the next
+    line); the line's start mark and line end stay
+
+Write "-" between the syllables of a word ("Ka-pr se pla-ca"). The
+characters - / < themselves are written \- \/ \<, a backslash \\, and a
+letter the window's letters cannot show \xHH (as it was).
+@endnode
+
+@node Staff "Staff"
+The notes of a track as notation, to read (editing is in the Piano Roll
+and the Event List): a grand staff - treble clef from C4 up, bass clef
+below - with the notes on a grid of sixteenths, open / filled heads, stems,
+flags, dots, sharps and ledger lines; bar lines with their numbers.
+
+@{b}Ch@{ub} shows only one channel; @{b}- / +@{ub} the width. While the song plays the line
+shows the position and the view turns the pages.
+@endnode
+
+@node XG4 "Sound names (XG4)"
+The sound and drum names of the XGM editor, the mixer and the Drum editor
+come from the voice lists of your XGworks V4.0 installation. Copy these
+files into the folder @{b}XG4@{ub} next to XGWorksLite:
+
+  Melody.ini, SFX.ini, SFX Kit.ini, Drum Kit.ini
+
+Without them General MIDI names are shown. They are read when the program
+starts; nothing of them is built into XGWorks Lite.
 @endnode
 
 @node XWS "XGworks songs (.XWS)"

@@ -60,6 +60,16 @@ XGWorksLite - the window
              chords -1 / +1, Midimusic export / import, no diacritics.
              Single lyrics and chords: the Event List, Show Lyrics / Chords.
 
+  XGM...     the part editor: a part's sound by name (programs, their
+             variations, SFX, drum kits) and the XG part parameters (note
+             shift, variation send, vibrato, cutoff, resonance, envelope,
+             bend range); saved with the mixer's Save.
+  Lyr.Edit...  the lyrics line by line: click a line, change it, Return.
+  Staff...   the notation of a track (grand staff), to read.
+
+  Sound names: copy Melody.ini, SFX.ini, SFX Kit.ini and Drum Kit.ini of
+  your XGworks V4.0 into the XG4 folder next to XGWorksLite (else GM names).
+
   With MUI installed the window is an MUI window; otherwise (or with CLASSIC)
   the classic GadTools window, which needs nothing extra. Keys in the classic
   window: P or Space = play, S = stop, Esc = quit.
