@@ -34,13 +34,16 @@ static int tsel = -1;
 
 /* ================= Event List ================= */
 
-enum { E_SCROLL, E_EDIT, E_APPLY, E_INSERT, E_DELETE, E_UNDO, E_INFO, E_N };
+enum { E_SCROLL, E_EDIT, E_APPLY, E_INSERT, E_DELETE, E_UNDO, E_FILTER, E_INFO, E_N };
+static const char *const FILTERS[] = {"All", "Notes", "Controls", "Lyrics", "Chords", "Texts", "SysEx", "Tempo", NULL};
+static int efilter;
+static uint32_t *emap, emapn, emapcap;   /* the rows shown: event indices */
 static struct Window *ew;
 static struct Gadget *egl, *eg[E_N];
 static void *evi;
 static struct TextFont *mono;
 static int etrk = -1;          /* the track shown */
-static long etop, esel = -1;   /* first row shown, selected event */
+static long etop, esel = -1;   /* first row shown, selected row */
 static int erows;
 static WORD ex0, ey0, ewid;
 static char eline[220], einfo[120];
@@ -164,7 +167,48 @@ static void tracks_close(void)
 
 /* ---------- Event List ---------- */
 
-static uint32_t enum_ev(App *a) { return etrk >= 0 && (uint32_t)etrk < a->ed.ntrk ? a->ed.trk[etrk].n : 0; }
+static int shown(const EdSong *s, const EdEv *e)
+{
+    const uint8_t *d = s->pool + e->data;
+    int k = e->st & 0xF0;
+    switch (efilter) {
+    case 1: return k == 0x80 || k == 0x90 || k == 0xA0;
+    case 2: return k >= 0xB0 && k <= 0xE0;
+    case 3: return e->st == 0xFF && e->d1 == 0x05;
+    case 4: return e->st == 0xFF && e->d1 == 0x7F && e->len == 7 && d[0] == 0x43 && d[1] == 0x7B;
+    case 5: return e->st == 0xFF && e->d1 >= 0x01 && e->d1 <= 0x07 && e->d1 != 0x05;
+    case 6: return e->st == 0xF0 || e->st == 0xF7;
+    case 7: return e->st == 0xFF && (e->d1 == 0x51 || e->d1 == 0x58 || e->d1 == 0x59);
+    default: return 1;
+    }
+}
+
+/* The rows of the filter (made again each time: the events change). */
+static uint32_t enum_ev(App *a)
+{
+    uint32_t i, n;
+    emapn = 0;
+    if (etrk < 0 || (uint32_t)etrk >= a->ed.ntrk) return 0;
+    n = a->ed.trk[etrk].n;
+    if (n > emapcap) {
+        uint32_t *nm = (uint32_t *)realloc(emap, (n + 64) * sizeof(uint32_t));
+        if (!nm) return 0;
+        emap = nm;
+        emapcap = n + 64;
+    }
+    for (i = 0; i < n; i++)
+        if (shown(&a->ed, &a->ed.trk[etrk].ev[i])) emap[emapn++] = i;
+    return emapn;
+}
+
+/* The row of event i (or the row after it). */
+static long row_of(App *a, long i)
+{
+    uint32_t r, n = enum_ev(a);
+    for (r = 0; r < n; r++)
+        if ((long)emap[r] >= i) return (long)r;
+    return (long)n - 1;
+}
 
 static void ev_draw(App *a)
 {
@@ -188,7 +232,7 @@ static void ev_draw(App *a)
         WORD y = (WORD)(ey0 + i * rp->TxHeight);
         int len;
         line[0] = 0;
-        if (k < (long)n) et_format(&a->ed, &a->ed.trk[etrk].ev[k], line, sizeof line, a->letters);
+        if (k < (long)n) et_format(&a->ed, &a->ed.trk[etrk].ev[emap[k]], line, sizeof line, a->letters);
         len = (int)strlen(line);
         {
             int cols = ewid / (rp->TxWidth ? rp->TxWidth : 8);
@@ -224,7 +268,7 @@ static void ev_select(App *a, long k, int show_line)
     if (esel < etop) etop = esel;
     if (esel >= etop + erows) etop = esel - erows + 1;
     if (show_line) {
-        et_format(&a->ed, &a->ed.trk[etrk].ev[esel], eline, sizeof eline, a->letters);
+        et_format(&a->ed, &a->ed.trk[etrk].ev[emap[esel]], eline, sizeof eline, a->letters);
         GT_SetGadgetAttrs(eg[E_EDIT], ew, NULL, GTST_String, (ULONG)eline, TAG_DONE);
     }
     ev_draw(a);
@@ -268,7 +312,9 @@ static int ev_open(App *a, int trk)
             ng.ng_GadgetText = (UBYTE *)txt[k]; ng.ng_GadgetID = ids[k]; ng.ng_Flags = PLACETEXT_IN;
             g = eg[ids[k]] = CreateGadget(BUTTON_KIND, g, &ng, TAG_DONE);
         }
-        ng.ng_LeftEdge = x0 + 300; ng.ng_Width = w - 300; ng.ng_GadgetText = NULL; ng.ng_GadgetID = E_INFO;
+        ng.ng_LeftEdge = x0 + 300; ng.ng_Width = 96; ng.ng_GadgetText = NULL; ng.ng_GadgetID = E_FILTER;
+        g = eg[E_FILTER] = CreateGadget(CYCLE_KIND, g, &ng, GTCY_Labels, (ULONG)FILTERS, GTCY_Active, efilter, TAG_DONE);
+        ng.ng_LeftEdge = x0 + 400; ng.ng_Width = w - 400; ng.ng_GadgetText = NULL; ng.ng_GadgetID = E_INFO;
         g = eg[E_INFO] = CreateGadget(TEXT_KIND, g, &ng, GTTX_Text, (ULONG)"Enter = apply, Del = delete", GTTX_Border, TRUE, TAG_DONE);
     }
     y += fh + 8;
@@ -277,7 +323,7 @@ static int ev_open(App *a, int trk)
         WA_InnerWidth, w + 8, WA_InnerHeight, y - scr->WBorTop - fh - 1,
         WA_Gadgets, (ULONG)egl, WA_DragBar, TRUE, WA_DepthGadget, TRUE, WA_CloseGadget, TRUE, WA_Activate, TRUE,
         WA_PubScreen, (ULONG)scr,
-        WA_IDCMP, IDCMP_CLOSEWINDOW | IDCMP_REFRESHWINDOW | IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY | IDCMP_VANILLAKEY | SCROLLERIDCMP | STRINGIDCMP | BUTTONIDCMP,
+        WA_IDCMP, IDCMP_CLOSEWINDOW | IDCMP_REFRESHWINDOW | IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY | IDCMP_VANILLAKEY | SCROLLERIDCMP | STRINGIDCMP | BUTTONIDCMP | CYCLEIDCMP,
         TAG_DONE);
     UnlockPubScreen(NULL, scr);
     if (!ew) { FreeGadgets(egl); egl = NULL; FreeVisualInfo(evi); return 0; }
@@ -348,16 +394,16 @@ static int ev_apply(App *a, int insert)
     const char *line = ((struct StringInfo *)eg[E_EDIT]->SpecialInfo)->Buffer;
     int ch = ed_channel(&a->ed, (uint32_t)etrk);
     long ni;
-    if (!insert && esel < 0) insert = 1;
-    if (!insert && a->ed.trk[etrk].ev[esel].st < 0xF0) ch = a->ed.trk[etrk].ev[esel].st & 0x0F;
+    if (!insert && (esel < 0 || esel >= (long)enum_ev(a))) insert = 1;
+    if (!insert && a->ed.trk[etrk].ev[emap[esel]].st < 0xF0) ch = a->ed.trk[etrk].ev[emap[esel]].st & 0x0F;
     if (!et_parse(&a->ed, line, &e, ch, a->letters, err, sizeof err)) { ev_info(err); return 0; }
     app_ed_begin(a);
     if (insert) ni = ed_insert(&a->ed, (uint32_t)etrk, &e) - 1L;
-    else ni = ed_replace(&a->ed, (uint32_t)etrk, (uint32_t)esel, &e);
+    else ni = ed_replace(&a->ed, (uint32_t)etrk, emap[esel], &e);
     if (ni < 0) { ev_info("Not enough memory."); return 0; }
     app_ed_commit(a);
     ev_info(insert ? "Inserted." : "Changed.");
-    ev_select(a, ni, 1);
+    ev_select(a, row_of(a, ni), 1);
     ev_title(a);
     return 1;
 }
@@ -366,7 +412,7 @@ static int ev_delete(App *a)
 {
     if (esel < 0 || esel >= (long)enum_ev(a)) return 0;
     app_ed_begin(a);
-    ed_delete(&a->ed, (uint32_t)etrk, (uint32_t)esel);
+    ed_delete(&a->ed, (uint32_t)etrk, emap[esel]);
     app_ed_commit(a);
     ev_info("Deleted.");
     ev_select(a, esel, 1);
@@ -499,6 +545,7 @@ int edw_handle(App *a)
             case E_INSERT: changed |= ev_apply(a, 1); break;
             case E_DELETE: changed |= ev_delete(a); break;
             case E_UNDO: app_undo(a); changed = 1; ev_info(a->info); edw_refresh(a); break;
+            case E_FILTER: efilter = code; etop = 0; ev_title(a); ev_select(a, 0, 1); break;
             }
             break;
         case IDCMP_RAWKEY: {

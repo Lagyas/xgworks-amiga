@@ -13,6 +13,9 @@
 #include "karawin.h"
 #include "edwin.h"
 #include "pianoroll.h"
+#include "drumwin.h"
+#include "lyrwin.h"
+#include "editors.h"
 
 struct Library *MUIMasterBase;
 
@@ -20,10 +23,10 @@ struct Library *MUIMasterBase;
 #define MAKE_ID(a, b, c, d) ((ULONG)(a) << 24 | (ULONG)(b) << 16 | (ULONG)(c) << 8 | (ULONG)(d))
 #endif
 
-enum { ID_PLAY = 1, ID_STOP, ID_PREV, ID_NEXT, ID_OPEN, ID_FOLDER, ID_LIST, ID_POS, ID_TEMPO, ID_TRANS, ID_RESET, ID_OUT, ID_MIX, ID_LYR, ID_TRK, ID_ROLL };
+enum { ID_PLAY = 1, ID_STOP, ID_PREV, ID_NEXT, ID_OPEN, ID_FOLDER, ID_LIST, ID_POS, ID_TEMPO, ID_TRANS, ID_RESET, ID_OUT, ID_MIX, ID_LYR, ID_TRK, ID_ROLL, ID_DRUMS, ID_TEXTS };
 
 static Object *app, *win, *list, *spos, *ttime, *stempo, *strans, *creset, *cout, *tinfo, *lv;
-static Object *bprev, *bplay, *bstop, *bnext, *bopen, *bdir, *bmix, *blyr, *btrk, *broll;
+static Object *bprev, *bplay, *bstop, *bnext, *bopen, *bdir, *bmix, *blyr, *btrk, *broll, *bdrum, *btext;
 
 static ULONG getv(Object *o, ULONG attr)
 {
@@ -62,8 +65,7 @@ static void start(App *a, int k, uint32_t from)
     if (k < 0) return;
     if (k != a->cur && !app_load(a, k)) { show(a); return; }
     mixmui_refresh(a);
-    edw_refresh(a);
-    pr_refresh(a);
+    eds_refresh(a);
     kw_update(a, from, 1);
     SetAttrs(spos, MUIA_NoNotify, TRUE, MUIA_Numeric_Max, a->len_us / 1000000 + 1, MUIA_Numeric_Value, from / 1000000, TAG_DONE);
     SetAttrs(list, MUIA_NoNotify, TRUE, MUIA_List_Active, k, TAG_DONE);
@@ -105,6 +107,8 @@ int gui_mui(App *a)
                     Child, blyr = SimpleButton("_Lyrics..."),
                     Child, btrk = SimpleButton("_Tracks..."),
                     Child, broll = SimpleButton("_Roll..."),
+                    Child, bdrum = SimpleButton("_Drums..."),
+                    Child, btext = SimpleButton("Te_xts..."),
                     Child, bopen = SimpleButton("_Open..."),
                     Child, bdir = SimpleButton("_Folder..."),
                 End,
@@ -135,11 +139,11 @@ int gui_mui(App *a)
         return -1;
     }
     {
-        Object *const btn[10] = {bprev, bplay, bstop, bnext, bopen, bdir, bmix, blyr, btrk, broll};
-        static const ULONG ids[10] = {ID_PREV, ID_PLAY, ID_STOP, ID_NEXT, ID_OPEN, ID_FOLDER, ID_MIX, ID_LYR, ID_TRK, ID_ROLL};
+        Object *const btn[12] = {bprev, bplay, bstop, bnext, bopen, bdir, bmix, blyr, btrk, broll, bdrum, btext};
+        static const ULONG ids[12] = {ID_PREV, ID_PLAY, ID_STOP, ID_NEXT, ID_OPEN, ID_FOLDER, ID_MIX, ID_LYR, ID_TRK, ID_ROLL, ID_DRUMS, ID_TEXTS};
         int k;
         mixmui_create(a, app);
-        for (k = 0; k < 10; k++) DoMethod(btn[k], MUIM_Notify, MUIA_Pressed, FALSE, (ULONG)app, 2, MUIM_Application_ReturnID, ids[k]);
+        for (k = 0; k < 12; k++) DoMethod(btn[k], MUIM_Notify, MUIA_Pressed, FALSE, (ULONG)app, 2, MUIM_Application_ReturnID, ids[k]);
     }
     DoMethod(win, MUIM_Notify, MUIA_Window_CloseRequest, TRUE, (ULONG)app, 2, MUIM_Application_ReturnID, MUIV_Application_ReturnID_Quit);
     DoMethod(lv, MUIM_Notify, MUIA_Listview_DoubleClick, TRUE, (ULONG)app, 2, MUIM_Application_ReturnID, ID_LIST);
@@ -220,6 +224,14 @@ int gui_mui(App *a)
             pr_open(a);
             show(a);
             break;
+        case ID_DRUMS:
+            dw_open(a);
+            show(a);
+            break;
+        case ID_TEXTS:
+            lw_open(a);
+            show(a);
+            break;
         default:
             if (mixmui_handle(a, id)) {
                 if (a->cur >= 0) SetAttrs(spos, MUIA_NoNotify, TRUE, MUIA_Numeric_Max, a->len_us / 1000000 + 1, TAG_DONE);
@@ -228,12 +240,9 @@ int gui_mui(App *a)
             break;
         }
         if (running && sigs) {
-            sigs = Wait(sigs | pl_signal() | kw_signal() | edw_signal() | pr_signal() | SIGBREAKF_CTRL_C);
-            if (sigs & (edw_signal() | pr_signal())) {
-                int ch = 0;
-                if (sigs & edw_signal()) { ch = edw_handle(a); if (ch) pr_refresh(a); }
-                if (sigs & pr_signal()) { int c2 = pr_handle(a); if (c2) edw_refresh(a); ch |= c2; }
-                if (ch) {
+            sigs = Wait(sigs | pl_signal() | kw_signal() | eds_signal() | SIGBREAKF_CTRL_C);
+            if (sigs & eds_signal()) {
+                if (eds_handle(a, sigs)) {
                     mixmui_refresh(a);
                     if (a->cur >= 0) {
                         SetAttrs(spos, MUIA_NoNotify, TRUE, MUIA_Numeric_Max, a->len_us / 1000000 + 1, TAG_DONE);
@@ -251,13 +260,12 @@ int gui_mui(App *a)
             }
             sigs &= ~(pl_signal() | SIGBREAKF_CTRL_C);
             if (kw_is_open() || (sigs & kw_signal())) sigs &= ~kw_signal();
-            sigs &= ~(edw_signal() | pr_signal());
+            sigs &= ~eds_signal();
         }
     }
     app_stop(a);
     kw_close();
-    edw_close_all();
-    pr_close();
+    eds_close();
     SetAttrs(win, MUIA_Window_Open, FALSE, TAG_DONE);
     MUI_DisposeObject(app);
     CloseLibrary(MUIMasterBase);
