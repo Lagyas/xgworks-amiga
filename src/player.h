@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 #include "smf.h"
+#include "mixer.h"
 
 typedef struct {
     /* set before pl_start */
@@ -16,6 +17,7 @@ typedef struct {
     char device[40];           /* "serial.device", "camd", … */
     long unit;
     /* may change while playing */
+    const Mixer *mixer;        /* NULL = the song as it is */
     volatile int tempo;        /* percent, 25..400 */
     volatile int transpose;    /* half-tones, notes of every channel but 10 */
     /* set by the player */
@@ -23,6 +25,9 @@ typedef struct {
     volatile int running;      /* the process is alive */
     volatile int ended;        /* reached the end of the song (not stopped) */
     char error[120];           /* why it could not play ("" = fine) */
+    /* messages from the window, sent at once (written by the window only) */
+    uint8_t q[64][3];
+    volatile uint32_t qw, qr;
 } Player;
 
 /* The signal the player sends to the calling task (allocated by pl_init). */
@@ -33,5 +38,7 @@ void pl_free(Player *p);
 int  pl_start(Player *p);
 /* Stop and wait until the process has ended. */
 void pl_stop(Player *p);
+/* While playing: send a short message as soon as possible; 0 = the queue is full. */
+int  pl_queue(Player *p, const uint8_t *msg);
 
 #endif

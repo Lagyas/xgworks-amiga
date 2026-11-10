@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "smf.h"
 #include "player.h"
+#include "mixer.h"
 
 #define RESETS 4   /* Off, XG, GM, GS */
 #define OUTPUTS 2  /* serial.device, CAMD */
@@ -25,6 +26,8 @@ typedef struct {
     long unit;
     char info[160];        /* the status line */
     int autonext;          /* the next song after the end */
+    Mixer mx;              /* the 16 parts of the loaded song */
+    int out_open;          /* the window task holds the MIDI output (not playing) */
 } App;
 
 extern const char *const app_reset_names[RESETS + 1];
@@ -45,6 +48,13 @@ int  app_poll(App *a);
 /* A file / a folder through the ASL requester (window: NULL or the window). */
 int  app_ask_file(App *a, void *window);
 int  app_ask_folder(App *a, void *window);
+/* A mixer change: sets it and sends it (also while playing). */
+void app_mix(App *a, int ch, int param, int value);
+void app_mute(App *a, int ch, int mute, int solo);
+/* Back to the song's own values. */
+void app_mix_reset(App *a);
+/* Write the mixer's values into the song file (song.mid.bak keeps the old one). */
+int  app_save(App *a);
 void app_set_tempo(App *a, int pct);
 void app_set_transpose(App *a, int semis);
 /* "m:ss" */

@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "app.h"
+#include "midiout.h"
 
 struct Library *AslBase;
 
@@ -109,6 +110,73 @@ int app_init(App *a, const char *folder)
     return 1;
 }
 
+/* The window task's own MIDI output (only while nothing plays). */
+static void out_close(App *a)
+{
+    if (a->out_open) mo_close();
+    a->out_open = 0;
+}
+
+static void send_now(App *a, const uint8_t *m)
+{
+    int k = m[0] & 0xF0;
+    if (app_playing(a)) {
+        pl_queue(&a->pl, m);
+        return;
+    }
+    if (!a->out_open) {
+        char err[120];
+        if (!mo_open(a->output == 1 ? "camd" : a->serdev, a->unit, err, sizeof err)) {
+            mo_close();
+            snprintf(a->info, sizeof a->info, "%s", err);
+            return;
+        }
+        a->out_open = 1;
+    }
+    mo_msg(m[0], m + 1, (k == 0xC0 || k == 0xD0) ? 1 : 2);
+    mo_flush();
+}
+
+void app_mix(App *a, int ch, int param, int value)
+{
+    uint8_t out[3][3];
+    int k, n = mx_set(&a->mx, ch, param, value, out);
+    for (k = 0; k < n; k++) send_now(a, out[k]);
+}
+
+void app_mute(App *a, int ch, int mute, int solo)
+{
+    int c;
+    a->mx.mute[ch] = (uint8_t)mute;
+    a->mx.solo[ch] = (uint8_t)solo;
+    /* what is silent now stops sounding */
+    for (c = 0; c < 16; c++)
+        if (!mx_audible(&a->mx, c)) {
+            uint8_t m[3];
+            m[0] = (uint8_t)(0xB0 | c); m[1] = 0x7B; m[2] = 0;
+            send_now(a, m);
+        }
+}
+
+void app_mix_reset(App *a)
+{
+    uint8_t m[16 * 8][3];
+    int k, n;
+    Mixer old = a->mx;
+    if (a->cur < 0) return;
+    mx_from_song(&a->mx, &a->song);
+    memcpy(a->mx.mute, old.mute, sizeof old.mute);
+    memcpy(a->mx.solo, old.solo, sizeof old.solo);
+    /* the song's values out again, for what was changed */
+    for (k = 0; k < 16; k++) {
+        int p;
+        for (p = 0; p < MX_N; p++) a->mx.touched[k][p] = old.touched[k][p];
+    }
+    n = mx_setup(&a->mx, m, 16 * 8);
+    memset(a->mx.touched, 0, sizeof a->mx.touched);
+    for (k = 0; k < n; k++) send_now(a, m[k]);
+}
+
 static void unload(App *a)
 {
     app_stop(a);
@@ -125,6 +193,7 @@ void app_free(App *a)
 {
     unload(a);
     pl_free(&a->pl);
+    out_close(a);
     free_names(a);
     if (AslBase) CloseLibrary(AslBase);
     AslBase = NULL;
@@ -167,6 +236,7 @@ int app_load(App *a, int k)
     }
     a->data = data;
     a->cur = k;
+    mx_from_song(&a->mx, &a->song);
     a->len_us = a->song.nev ? xg_tick_us(&a->song, a->song.ev[a->song.nev - 1].tick) : 0;
     {
         char t[16];
@@ -181,7 +251,9 @@ int app_play(App *a, uint32_t from_us)
     Player *p = &a->pl;
     if (a->cur < 0) return 0;
     app_stop(a);
+    out_close(a);  /* the player opens the output itself */
     p->song = &a->song;
+    p->mixer = &a->mx;
     p->from_us = from_us;
     switch (a->reset) {
     case 1: p->reset = XG_ON; p->rlen = sizeof XG_ON; break;
@@ -221,6 +293,57 @@ int app_poll(App *a)
         return 1;
     }
     return 0;
+}
+
+static int write_file(const char *path, const uint8_t *b, size_t n)
+{
+    BPTR fh = Open((CONST_STRPTR)path, MODE_NEWFILE);
+    LONG w;
+    if (!fh) return 0;
+    w = Write(fh, (APTR)b, (LONG)n);
+    Close(fh);
+    return w == (LONG)n;
+}
+
+int app_save(App *a)
+{
+    char path[512], bak[520];
+    uint8_t *nb;
+    size_t n;
+    int k = a->cur;
+    BPTR l;
+    if (k < 0) return 0;
+    if (!mx_any_touched(&a->mx)) {
+        snprintf(a->info, sizeof a->info, "Nothing changed in the mixer.");
+        return 0;
+    }
+    app_stop(a);
+    if (!(nb = mx_save(&a->mx, &a->song, &n))) {
+        snprintf(a->info, sizeof a->info, "Not enough memory to save.");
+        return 0;
+    }
+    strncpy(path, a->folder, sizeof path - 1);
+    path[sizeof path - 1] = 0;
+    AddPart((STRPTR)path, (CONST_STRPTR)a->names[k], sizeof path);
+    /* the first save keeps the original as .bak */
+    snprintf(bak, sizeof bak, "%s.bak", path);
+    if ((l = Lock((CONST_STRPTR)bak, ACCESS_READ))) UnLock(l);
+    else write_file(bak, a->data, a->song.size);
+    if (!write_file(path, nb, n)) {
+        free(nb);
+        snprintf(a->info, sizeof a->info, "%s cannot be written.", a->names[k]);
+        return 0;
+    }
+    free(nb);
+    {
+        Mixer keep = a->mx;
+        a->cur = -1;   /* load it again */
+        if (!app_load(a, k)) return 0;
+        memcpy(a->mx.mute, keep.mute, sizeof keep.mute);
+        memcpy(a->mx.solo, keep.solo, sizeof keep.solo);
+    }
+    snprintf(a->info, sizeof a->info, "%s saved (the old one: .bak).", a->names[k]);
+    return 1;
 }
 
 void app_set_tempo(App *a, int pct)

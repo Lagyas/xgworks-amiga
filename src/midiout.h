@@ -17,7 +17,8 @@ void mo_flush(void);
 /* Start the clock (time 0 = now); the time since then. */
 void mo_clock_start(void);
 uint32_t mo_now_us(void);
-/* Wait until `us` after the clock start; 0 = Ctrl+C (stop) arrived. */
+/* Wait until `us` after the clock start; 0 = Ctrl+C (stop) arrived,
+ * 2 = Ctrl+D (something to send now) arrived, 1 = the time came. */
 int  mo_wait_until(uint32_t us);
 
 #endif

@@ -103,6 +103,7 @@ static int play(const XgSong *s, const Opts *o, const uint8_t *reset, uint32_t r
     while (i < s->nev && ok) {
         uint32_t t = xg_tick_us(s, s->ev[i].tick);
         if (!(ok = mo_wait_until(start_us + t))) break;
+        if (ok == 2) { ok = 1; continue; }
         /* everything due now in one write */
         while (i < s->nev && xg_tick_us(s, s->ev[i].tick) <= t) {
             const XgEv *e = &s->ev[i++];

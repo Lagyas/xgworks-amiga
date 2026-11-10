@@ -15,6 +15,7 @@ jobs:
           python3 tools/gen_test_mid.py build/test.mid
           build/xgplay-host build/test.mid DUMP > build/host.txt
           wc -l build/host.txt
+          (cd build && ./test_mixer test.mid)
       - name: Amiga build (68020, amiga-gcc)
         run: docker run --rm -v "$PWD:/work" -w /work sacredbanana/amiga-compiler:m68k-amigaos make all
       - name: The Amiga program run in vamos (68k emulation of the AmigaOS Shell)

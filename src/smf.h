@@ -13,8 +13,9 @@
 typedef struct {
     uint32_t tick;
     uint32_t seq;     /* file order: keeps the sort stable */
-    uint32_t off;     /* SysEx: the data after the length, in the file buffer */
+    uint32_t off;     /* in the file: SysEx data after the length; short message: its first data byte */
     uint32_t len;     /* SysEx: data length (without the status byte) */
+    uint16_t trk;     /* the track (0 = first MTrk) */
     uint8_t  cls;     /* order within a tick: 0 reset, 1 other, 2 note-on */
     uint8_t  n;       /* bytes in msg (1..3); 0 = SysEx */
     uint8_t  msg[3];  /* short message; msg[0] = F0 / F7 for SysEx */
@@ -34,6 +35,8 @@ typedef struct {
     uint32_t nev;
     XgTempo *tempo;
     uint32_t ntempo;
+    uint32_t *trk_off;  /* each MTrk chunk: offset of its header */
+    uint32_t ntrk;
 } XgSong;
 
 /* Errors of xg_smf_load. */
@@ -49,5 +52,19 @@ uint32_t xg_tick_us(const XgSong *s, uint32_t tick);
 
 /* XG / GM / GS System On (or XG All Parameter Reset): sent first within its tick. */
 int xg_is_reset(const uint8_t *sysex_after_f0, uint32_t len);
+
+/* One message to put into a track at a tick (status + data, or F0 + length-less data). */
+typedef struct {
+    uint16_t trk;
+    uint32_t tick;
+    uint8_t  n;
+    uint8_t  b[12];
+} XgInsert;
+
+/* A new file: `s`'s bytes with `patched` (same size as the file, or NULL =
+ * the song's own) and the messages of `ins` put in; NULL = no memory.
+ * Tracks with insertions are rewritten with explicit status bytes where a
+ * running status would no longer be right. Only channel messages may be inserted. */
+uint8_t *xg_smf_rebuild(const XgSong *s, const uint8_t *patched, const XgInsert *ins, uint32_t nins, size_t *out_size);
 
 #endif

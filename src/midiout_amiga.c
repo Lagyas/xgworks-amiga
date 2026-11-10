@@ -184,17 +184,18 @@ int mo_wait_until(uint32_t us)
     if (target.tv_micro >= 1000000) { target.tv_micro -= 1000000; target.tv_secs++; }
     GetSysTime(&now);
     if (CmpTime(&now, &target) <= 0) {   /* now >= target: no waiting */
-        return !(SetSignal(0, SIGBREAKF_CTRL_C) & SIGBREAKF_CTRL_C);
+        ULONG s = SetSignal(0, SIGBREAKF_CTRL_C | SIGBREAKF_CTRL_D);
+        return (s & SIGBREAKF_CTRL_C) ? 0 : (s & SIGBREAKF_CTRL_D) ? 2 : 1;
     }
     SubTime(&target, &now);
     tim->tr_node.io_Command = TR_ADDREQUEST;
     tim->tr_time = target;
     SendIO((struct IORequest *)tim);
-    sigs = Wait((1UL << tim_port->mp_SigBit) | SIGBREAKF_CTRL_C);
-    if (sigs & SIGBREAKF_CTRL_C) {
+    sigs = Wait((1UL << tim_port->mp_SigBit) | SIGBREAKF_CTRL_C | SIGBREAKF_CTRL_D);
+    if (sigs & (SIGBREAKF_CTRL_C | SIGBREAKF_CTRL_D)) {
         if (!CheckIO((struct IORequest *)tim)) AbortIO((struct IORequest *)tim);
         WaitIO((struct IORequest *)tim);
-        return 0;
+        return (sigs & SIGBREAKF_CTRL_C) ? 0 : 2;
     }
     WaitIO((struct IORequest *)tim);
     return 1;

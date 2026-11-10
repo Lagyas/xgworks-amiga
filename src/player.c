@@ -47,21 +47,45 @@ static int is_note(uint8_t st)
     return k == 0x80 || k == 0x90 || k == 0xA0;
 }
 
-static void send(const XgSong *s, const XgEv *e, int transpose)
+static void send(const Player *p, const XgSong *s, const XgEv *e, int transpose)
 {
+    uint8_t m[3], out[3];
     if (!e->n) {
+        if (p->mixer && e->msg[0] == 0xF0 && !mx_filter_sysex(p->mixer, s->buf + e->off, e->len)) return;
         mo_msg(e->msg[0], s->buf + e->off, e->len);
         return;
     }
-    if (transpose && is_note(e->msg[0]) && (e->msg[0] & 0x0F) != 9) {
-        int k = e->msg[1] + transpose;
-        uint8_t d[2];
+    memcpy(m, e->msg, 3);
+    if (transpose && is_note(m[0]) && (m[0] & 0x0F) != 9) {
+        int k = m[1] + transpose;
         if (k < 0 || k > 127) return;
-        d[0] = (uint8_t)k; d[1] = e->msg[2];
-        mo_msg(e->msg[0], d, 2);
-        return;
+        m[1] = (uint8_t)k;
     }
-    mo_msg(e->msg[0], e->msg + 1, e->n - 1u);
+    if (p->mixer && !mx_filter(p->mixer, m, e->n, out)) return;
+    mo_msg(p->mixer ? out[0] : m[0], p->mixer ? out + 1 : m + 1, e->n - 1u);
+}
+
+/* what the window queued */
+static void drain(Player *p)
+{
+    while (p->qr != p->qw) {
+        const uint8_t *m = p->q[p->qr % 64];
+        int k = m[0] & 0xF0;
+        mo_msg(m[0], m + 1, (k == 0xC0 || k == 0xD0) ? 1 : 2);
+        p->qr++;
+    }
+    mo_flush();
+}
+
+int pl_queue(Player *p, const uint8_t *msg)
+{
+    if (p->qw - p->qr >= 64) return 0;
+    memcpy(p->q[p->qw % 64], msg, 3);
+    p->qw++;
+    Forbid();
+    if (p->running && proc) Signal((struct Task *)proc, SIGBREAKF_CTRL_D);
+    Permit();
+    return 1;
 }
 
 static void notes_off(void)
@@ -106,9 +130,16 @@ static void play(Player *p)
     }
     /* from the middle: the settings before that point (no notes) */
     while (i < s->nev && xg_tick_us(s, s->ev[i].tick) < p->from_us) {
-        if (s->ev[i].n == 0 || !is_note(s->ev[i].msg[0])) send(s, &s->ev[i], 0);
+        if (s->ev[i].n == 0 || !is_note(s->ev[i].msg[0])) send(p, s, &s->ev[i], 0);
         i++;
     }
+    /* the mixer's values (they win over the song's) */
+    if (p->mixer) {
+        uint8_t m[16 * 8][3];
+        int k, n = mx_setup(p->mixer, m, 16 * 8);
+        for (k = 0; k < n; k++) mo_msg(m[k][0], m[k] + 1, (m[k][0] & 0xF0) == 0xC0 ? 1 : 2);
+    }
+    p->qr = p->qw;
     mo_flush();
     mo_clock_start();
     a.song = p->from_us;
@@ -117,6 +148,7 @@ static void play(Player *p)
     p->pos_us = p->from_us;
     while (i < s->nev && ok) {
         uint32_t t = xg_tick_us(s, s->ev[i].tick), due, now;
+        if (p->qr != p->qw) drain(p);
         if (p->tempo != a.pct) {
             now = mo_now_us();
             a.song = to_song(&a, now);
@@ -132,12 +164,13 @@ static void play(Player *p)
         if (due > now + 100000) {
             /* a long rest: wake up every 0.1 s for the position and changes */
             ok = mo_wait_until(now + 100000);
-            p->pos_us = to_song(&a, now + 100000);
+            p->pos_us = to_song(&a, mo_now_us());
             tell();
             continue;
         }
         if (!(ok = mo_wait_until(due))) break;
-        while (i < s->nev && xg_tick_us(s, s->ev[i].tick) <= t) send(s, &s->ev[i++], tr);
+        if (ok == 2) continue;  /* the window has something to send: then on */
+        while (i < s->nev && xg_tick_us(s, s->ev[i].tick) <= t) send(p, s, &s->ev[i++], tr);
         mo_flush();
         p->pos_us = t;
         if (t - last_tell >= 100000 || t < last_tell) {
