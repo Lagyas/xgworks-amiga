@@ -17,6 +17,7 @@
    @{" Lyrics and chords     " link Lyrics}
    @{" Tracks                " link Tracks}
    @{" Event List            " link Events}
+   @{" Piano Roll            " link Roll}
    @{" XGworks songs (.XWS)  " link XWS}
    @{" MIDI output           " link Output}
    @{" XGPlay (Shell)        " link XGPlay}
@@ -59,6 +60,7 @@ previous / next song. At the end of a song the next one starts.
   @{b}Mixer...@{ub}    the @{"mixer" link Mixer}
   @{b}Lyrics...@{ub}   the @{"karaoke window" link Lyrics}
   @{b}Tracks...@{ub}   the @{"tracks of the song" link Tracks} and their @{"events" link Events}
+  @{b}Roll...@{ub}     the @{"Piano Roll" link Roll} of the track selected in Tracks
 
   @{b}Position@{ub}    drag to move in the song; what the song sets before that
               point (sounds, levels, effects) is sent first
@@ -169,6 +171,37 @@ The kinds and their values:
 
 The position is bar:beat:tick (by the song's time signatures); the
 channel may be left out (the track's channel is taken).
+@endnode
+
+@node Roll "Piano Roll"
+The notes of a track on a grid of time (bars along the top) and keys (the
+keyboard on the left); under them the velocities. The window can be sized;
+the scrollers are in its borders. It shows the track selected in the Tracks
+window, else the first track with notes.
+
+Tools (the first gadget):
+
+  @{b}Select@{ub}  click a note to select it (Shift: add to the selection), drag
+          it to move the selection (time by the grid, keys by rows), drag
+          its right end to change the length; drag on empty space to select
+          the notes in a rectangle
+  @{b}Draw@{ub}    click on empty space for a new note (a grid step long), or drag
+          to the length you want
+  @{b}Erase@{ub}   click a note to delete it
+
+  @{b}Grid@{ub}    1/4 ... 1/32, triplets, or off
+  @{b}Ch@{ub}      all channels, or only notes of one (new notes get it)
+  @{b}Vel@{ub}     velocity of new notes; changing it sets the selected notes
+  @{b}H- H+ V- V+@{ub}  zoom in time and in keys
+  @{b}Undo@{ub}    undo the last change
+
+Keys: Del deletes the selection; cursor up / down moves it a half-tone
+(Shift: an octave), left / right a grid step; A selects all; C copies the
+selection a bar later; + / - zoom; Esc closes. A click on the keyboard plays
+the key, and a note is heard when it is clicked or drawn.
+
+While the song plays the line shows the position and the view turns the
+pages. Every change is heard at once.
 @endnode
 
 @node XWS "XGworks songs (.XWS)"

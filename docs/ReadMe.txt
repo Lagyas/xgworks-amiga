@@ -48,6 +48,11 @@ XGWorksLite - the window
              event as a line (0012:1:000  1  Note  C3  100  480) - change the
              line and press Return, Shift+Return inserts, Del deletes.
 
+  Roll...    the Piano Roll of the track selected in Tracks: Select / Draw /
+             Erase, drag to move, drag the right end for the length, a
+             rectangle selects; grid, channel, velocity, zoom; Del, cursor
+             keys, A (all), C (copy a bar later). Velocities under the notes.
+
   With MUI installed the window is an MUI window; otherwise (or with CLASSIC)
   the classic GadTools window, which needs nothing extra. Keys in the classic
   window: P or Space = play, S = stop, Esc = quit.
