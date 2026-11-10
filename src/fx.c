@@ -96,7 +96,7 @@ void fx_from_song(Fx *f, const XgSong *s)
     if (cm >= 0) f->sel[1] = (uint8_t)find(XG_CHO, NXC, cm, cl);
 }
 
-int fx_msg(const Fx *f, int what, uint8_t *o)
+int fx_msg(const Fx *f, int what, uint8_t o[16])
 {
     if (f->gs) {
         static const uint8_t addr[FX_N] = {0x30, 0x38, 0x33, 0x3A};
