@@ -9,10 +9,11 @@
 #include "xgmwin.h"
 #include "lyredwin.h"
 #include "staffwin.h"
+#include "jobwin.h"
 
 unsigned long eds_signal(void)
 {
-    return edw_signal() | pr_signal() | dw_signal() | lw_signal() | xw_signal() | yw_signal() | sw_signal();
+    return edw_signal() | pr_signal() | dw_signal() | lw_signal() | xw_signal() | yw_signal() | sw_signal() | jw_signal();
 }
 
 void eds_refresh(App *a)
@@ -42,6 +43,7 @@ int eds_handle(App *a, unsigned long sigs)
     if (sigs & xw_signal()) ch |= xw_handle(a);
     if (sigs & yw_signal()) ch |= yw_handle(a);
     if (sigs & sw_signal()) sw_handle(a);
+    if (sigs & jw_signal()) ch |= jw_handle(a);
     if (ch) eds_refresh(a);
     return ch;
 }
@@ -55,4 +57,5 @@ void eds_close(void)
     xw_close();
     yw_close();
     sw_close();
+    jw_close();
 }

@@ -19,6 +19,7 @@
 #include "xgmwin.h"
 #include "lyredwin.h"
 #include "staffwin.h"
+#include "jobwin.h"
 
 struct Library *MUIMasterBase;
 
@@ -26,10 +27,10 @@ struct Library *MUIMasterBase;
 #define MAKE_ID(a, b, c, d) ((ULONG)(a) << 24 | (ULONG)(b) << 16 | (ULONG)(c) << 8 | (ULONG)(d))
 #endif
 
-enum { ID_PLAY = 1, ID_STOP, ID_PREV, ID_NEXT, ID_OPEN, ID_FOLDER, ID_LIST, ID_POS, ID_TEMPO, ID_TRANS, ID_RESET, ID_OUT, ID_MIX, ID_LYR, ID_TRK, ID_ROLL, ID_DRUMS, ID_TEXTS, ID_XGM, ID_LYRED, ID_STAFF };
+enum { ID_PLAY = 1, ID_STOP, ID_PREV, ID_NEXT, ID_OPEN, ID_FOLDER, ID_LIST, ID_POS, ID_TEMPO, ID_TRANS, ID_RESET, ID_OUT, ID_MIX, ID_LYR, ID_TRK, ID_ROLL, ID_DRUMS, ID_TEXTS, ID_XGM, ID_LYRED, ID_STAFF, ID_JOBS };
 
 static Object *app, *win, *list, *spos, *ttime, *stempo, *strans, *creset, *cout, *tinfo, *lv;
-static Object *bprev, *bplay, *bstop, *bnext, *bopen, *bdir, *bmix, *blyr, *btrk, *broll, *bdrum, *btext, *bxgm, *blyred, *bstaff;
+static Object *bprev, *bplay, *bstop, *bnext, *bopen, *bdir, *bmix, *blyr, *btrk, *broll, *bdrum, *btext, *bxgm, *blyred, *bstaff, *bjobs;
 
 static ULONG getv(Object *o, ULONG attr)
 {
@@ -121,6 +122,7 @@ int gui_mui(App *a)
                     Child, broll = SimpleButton("_Roll..."),
                     Child, bdrum = SimpleButton("_Drums..."),
                     Child, bstaff = SimpleButton("St_aff..."),
+                    Child, bjobs = SimpleButton("_Jobs..."),
                 End,
                 Child, ColGroup(2),
                     Child, Label("Position"),
@@ -149,11 +151,11 @@ int gui_mui(App *a)
         return -1;
     }
     {
-        Object *const btn[15] = {bprev, bplay, bstop, bnext, bopen, bdir, bmix, blyr, btrk, broll, bdrum, btext, bxgm, blyred, bstaff};
-        static const ULONG ids[15] = {ID_PREV, ID_PLAY, ID_STOP, ID_NEXT, ID_OPEN, ID_FOLDER, ID_MIX, ID_LYR, ID_TRK, ID_ROLL, ID_DRUMS, ID_TEXTS, ID_XGM, ID_LYRED, ID_STAFF};
+        Object *const btn[16] = {bprev, bplay, bstop, bnext, bopen, bdir, bmix, blyr, btrk, broll, bdrum, btext, bxgm, blyred, bstaff, bjobs};
+        static const ULONG ids[16] = {ID_PREV, ID_PLAY, ID_STOP, ID_NEXT, ID_OPEN, ID_FOLDER, ID_MIX, ID_LYR, ID_TRK, ID_ROLL, ID_DRUMS, ID_TEXTS, ID_XGM, ID_LYRED, ID_STAFF, ID_JOBS};
         int k;
         mixmui_create(a, app);
-        for (k = 0; k < 15; k++) DoMethod(btn[k], MUIM_Notify, MUIA_Pressed, FALSE, (ULONG)app, 2, MUIM_Application_ReturnID, ids[k]);
+        for (k = 0; k < 16; k++) DoMethod(btn[k], MUIM_Notify, MUIA_Pressed, FALSE, (ULONG)app, 2, MUIM_Application_ReturnID, ids[k]);
     }
     DoMethod(win, MUIM_Notify, MUIA_Window_CloseRequest, TRUE, (ULONG)app, 2, MUIM_Application_ReturnID, MUIV_Application_ReturnID_Quit);
     DoMethod(lv, MUIM_Notify, MUIA_Listview_DoubleClick, TRUE, (ULONG)app, 2, MUIM_Application_ReturnID, ID_LIST);
@@ -251,6 +253,10 @@ int gui_mui(App *a)
             break;
         case ID_STAFF:
             sw_open(a);
+            show(a);
+            break;
+        case ID_JOBS:
+            jw_open(a);
             show(a);
             break;
         default:
