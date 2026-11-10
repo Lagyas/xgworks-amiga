@@ -42,7 +42,22 @@ int xg_is_reset(const uint8_t *d, uint32_t len)
 typedef struct {
     XgEv *ev; uint32_t n, cap;
     XgTempo *tp; uint32_t ntp, cptp;
+    XgText *tx; uint32_t ntx, cptx;
 } Lists;
+
+static int push_text(Lists *l, uint32_t tick, uint32_t off, uint32_t len, uint16_t trk, uint8_t type)
+{
+    if (l->ntx == l->cptx) {
+        uint32_t cap = l->cptx ? l->cptx * 2 : 256;
+        XgText *nv = (XgText *)realloc(l->tx, cap * sizeof(XgText));
+        if (!nv) return 0;
+        l->tx = nv; l->cptx = cap;
+    }
+    l->tx[l->ntx].tick = tick; l->tx[l->ntx].off = off; l->tx[l->ntx].len = (uint16_t)(len > 0xFFFF ? 0xFFFF : len);
+    l->tx[l->ntx].trk = trk; l->tx[l->ntx].type = type;
+    l->ntx++;
+    return 1;
+}
 
 static int push_ev(Lists *l, const XgEv *e)
 {
@@ -93,6 +108,8 @@ static int track(Lists *l, const uint8_t *base, const uint8_t *p, const uint8_t 
             len = varlen(&p, end);
             if (len > (uint32_t)(end - p)) return XG_EBROKEN;
             if (type == 0x51 && len == 3 && !push_tempo(l, tick, ((uint32_t)p[0] << 16) | ((uint32_t)p[1] << 8) | p[2])) return XG_ENOMEM;
+            if ((type == 0x01 || type == 0x05 || (type == 0x7F && len == 7 && p[0] == 0x43 && p[1] == 0x7B && p[2] == 0x01))
+                && !push_text(l, tick, (uint32_t)(p - base), len, trk, type)) return XG_ENOMEM;
             p += len;
             if (type == 0x2F) break;
             continue;
@@ -169,10 +186,10 @@ int xg_smf_load(XgSong *s, const uint8_t *buf, size_t size)
         }
         p = e;
     }
-    if (r != XG_OK) { free(l.ev); free(l.tp); free(s->trk_off); s->trk_off = NULL; return r; }
+    if (r != XG_OK) { free(l.ev); free(l.tp); free(l.tx); free(s->trk_off); s->trk_off = NULL; return r; }
     /* the tempo map: 120 BPM at the start when the song sets none there */
     for (i = 0; i < l.ntp && l.tp[i].tick != 0; i++) {}
-    if (i == l.ntp && !push_tempo(&l, 0, 500000)) { free(l.ev); free(l.tp); return XG_ENOMEM; }
+    if (i == l.ntp && !push_tempo(&l, 0, 500000)) { free(l.ev); free(l.tp); free(l.tx); free(s->trk_off); s->trk_off = NULL; return XG_ENOMEM; }
     qsort(l.tp, l.ntp, sizeof(XgTempo), tp_cmp);
     /* one tempo per tick (the last one written wins, as a player hears it) */
     for (i = 0, k = 0; i < l.ntp; i++) {
@@ -183,6 +200,16 @@ int xg_smf_load(XgSong *s, const uint8_t *buf, size_t size)
     for (i = 1; i < l.ntp; i++)
         l.tp[i].at_num = l.tp[i - 1].at_num + (uint64_t)(l.tp[i].tick - l.tp[i - 1].tick) * l.tp[i - 1].us_qn;
     qsort(l.ev, l.n, sizeof(XgEv), ev_cmp);
+    /* texts by time; one track after another keeps the order within a tick */
+    {
+        uint32_t a, b;
+        for (a = 1; a < l.ntx; a++) {
+            XgText x = l.tx[a];
+            for (b = a; b > 0 && (l.tx[b - 1].tick > x.tick); b--) l.tx[b] = l.tx[b - 1];
+            l.tx[b] = x;
+        }
+    }
+    s->txt = l.tx; s->ntxt = l.ntx;
     s->ev = l.ev; s->nev = l.n;
     s->tempo = l.tp; s->ntempo = l.ntp;
     return XG_OK;
@@ -193,6 +220,7 @@ void xg_smf_free(XgSong *s)
     free(s->ev);
     free(s->tempo);
     free(s->trk_off);
+    free(s->txt);
     memset(s, 0, sizeof *s);
 }
 
@@ -333,4 +361,17 @@ fail:
     free(sorted);
     free(o.b);
     return NULL;
+}
+
+uint32_t xg_us_tick(const XgSong *s, uint32_t us)
+{
+    uint64_t num = (uint64_t)us * s->ppqn;
+    uint32_t lo = 0, hi = s->ntempo;
+    /* the last tempo change at or before `us` */
+    while (hi - lo > 1) {
+        uint32_t mid = (lo + hi) / 2;
+        if (s->tempo[mid].at_num <= num) lo = mid; else hi = mid;
+    }
+    if (num < s->tempo[lo].at_num) return s->tempo[lo].tick;
+    return s->tempo[lo].tick + (uint32_t)((num - s->tempo[lo].at_num) / s->tempo[lo].us_qn);
 }

@@ -7,6 +7,7 @@
 #include "smf.h"
 #include "player.h"
 #include "mixer.h"
+#include "lyrics.h"
 
 #define RESETS 4   /* Off, XG, GM, GS */
 #define OUTPUTS 2  /* serial.device, CAMD */
@@ -28,6 +29,9 @@ typedef struct {
     int autonext;          /* the next song after the end */
     Mixer mx;              /* the 16 parts of the loaded song */
     int out_open;          /* the window task holds the MIDI output (not playing) */
+    Lyrics ly;             /* lyrics and chords of the loaded song */
+    int letters;           /* TM_ASCII, TM_LATIN2, TM_LATIN1 */
+    int kfont;             /* karaoke text size */
 } App;
 
 extern const char *const app_reset_names[RESETS + 1];
@@ -55,6 +59,8 @@ void app_mute(App *a, int ch, int mute, int solo);
 void app_mix_reset(App *a);
 /* Write the mixer's values into the song file (song.mid.bak keeps the old one). */
 int  app_save(App *a);
+/* How lyrics are written: plain letters, ISO-8859-2 or Latin-1 (rebuilds them). */
+void app_set_letters(App *a, int letters);
 void app_set_tempo(App *a, int pct);
 void app_set_transpose(App *a, int semis);
 /* "m:ss" */

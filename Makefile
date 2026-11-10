@@ -8,7 +8,7 @@ CFLAGS  = -m68020 -O2 -noixemul -Wall -Wno-pointer-sign -fomit-frame-pointer
 SRC     = src/xgplay.c src/smf.c
 HOSTCC  ?= cc
 
-LITE    = src/main.c src/app.c src/player.c src/mixer.c src/gui_mui.c src/gui_gadtools.c src/mixwin_mui.c src/mixwin_gt.c src/smf.c src/midiout_amiga.c
+LITE    = src/main.c src/app.c src/player.c src/mixer.c src/gui_mui.c src/gui_gadtools.c src/mixwin_mui.c src/mixwin_gt.c src/karawin.c src/lyrics.c src/textmap.c src/textmap_data.c src/smf.c src/midiout_amiga.c
 
 all: XGPlay XGWorksLite
 
@@ -22,6 +22,7 @@ host: $(SRC) src/smf.h src/mixer.c tools/test_mixer.c
 	mkdir -p build
 	$(HOSTCC) -O2 -Wall -Wextra -std=c99 -o build/xgplay-host $(SRC)
 	$(HOSTCC) -O2 -Wall -Wextra -std=c99 -o build/test_mixer tools/test_mixer.c src/smf.c src/mixer.c
+	$(HOSTCC) -O2 -Wall -Wextra -std=c99 -o build/test_lyrics tools/test_lyrics.c src/smf.c src/lyrics.c src/textmap.c src/textmap_data.c
 
 clean:
 	rm -rf XGPlay XGWorksLite build

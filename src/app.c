@@ -94,6 +94,7 @@ int app_init(App *a, const char *folder)
     memset(a, 0, sizeof *a);
     a->cur = -1;
     a->autonext = 1;
+    a->kfont = 24;
     strcpy(a->serdev, "serial.device");
     strcpy(a->folder, "PROGDIR:Songs");
     if (!pl_init(&a->pl)) return 0;
@@ -181,6 +182,7 @@ static void unload(App *a)
 {
     app_stop(a);
     if (a->data) {
+        ly_free(&a->ly);
         xg_smf_free(&a->song);
         free(a->data);
     }
@@ -237,6 +239,7 @@ int app_load(App *a, int k)
     a->data = data;
     a->cur = k;
     mx_from_song(&a->mx, &a->song);
+    ly_build(&a->ly, &a->song, a->letters);
     a->len_us = a->song.nev ? xg_tick_us(&a->song, a->song.ev[a->song.nev - 1].tick) : 0;
     {
         char t[16];
@@ -346,6 +349,15 @@ int app_save(App *a)
     return 1;
 }
 
+void app_set_letters(App *a, int letters)
+{
+    a->letters = letters;
+    if (a->cur >= 0) {
+        ly_free(&a->ly);
+        ly_build(&a->ly, &a->song, letters);
+    }
+}
+
 void app_set_tempo(App *a, int pct)
 {
     a->pl.tempo = pct < 25 ? 25 : pct > 400 ? 400 : pct;
@@ -432,6 +444,8 @@ void app_load_prefs(App *a)
         else if (!strcmp(line, "device")) { strncpy(a->serdev, v, sizeof a->serdev - 1); }
         else if (!strcmp(line, "unit")) a->unit = atol(v);
         else if (!strcmp(line, "tempo")) app_set_tempo(a, atoi(v));
+        else if (!strcmp(line, "letters")) a->letters = atoi(v) % 3;
+        else if (!strcmp(line, "lyricsize")) a->kfont = atoi(v) < 8 ? 24 : atoi(v);
     }
     fclose(f);
 }
@@ -443,7 +457,7 @@ void app_save_prefs(const App *a)
     for (k = 0; k < 2; k++) {
         FILE *f = fopen(files[k], "w");
         if (!f) continue;
-        fprintf(f, "folder=%s\nreset=%d\noutput=%d\ndevice=%s\nunit=%ld\ntempo=%d\n", a->folder, a->reset, a->output, a->serdev, a->unit, a->pl.tempo);
+        fprintf(f, "folder=%s\nreset=%d\noutput=%d\ndevice=%s\nunit=%ld\ntempo=%d\nletters=%d\nlyricsize=%d\n", a->folder, a->reset, a->output, a->serdev, a->unit, a->pl.tempo, a->letters, a->kfont);
         fclose(f);
     }
 }

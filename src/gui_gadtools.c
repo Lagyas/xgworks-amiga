@@ -18,10 +18,11 @@
 #include <string.h>
 #include "gui.h"
 #include "mixwin.h"
+#include "karawin.h"
 
 struct Library *GadToolsBase;
 
-enum { G_LIST, G_PREV, G_PLAY, G_STOP, G_NEXT, G_MIX, G_OPEN, G_FOLDER, G_POS, G_TIME, G_TEMPO, G_TRANS, G_RESET, G_OUT, G_INFO, G_COUNT };
+enum { G_LIST, G_PREV, G_PLAY, G_STOP, G_NEXT, G_MIX, G_LYR, G_OPEN, G_FOLDER, G_POS, G_TIME, G_TEMPO, G_TRANS, G_RESET, G_OUT, G_INFO, G_COUNT };
 
 static struct Gadget *gad[G_COUNT];
 static struct Window *win;
@@ -61,6 +62,7 @@ static void show(App *a)
         shown_pos = pos;
         set(G_POS, GTSL_Level, pos / 1000000);
     }
+    kw_update(a, pos, 0);
     set(G_INFO, GTTX_Text, (ULONG)a->info);
 }
 
@@ -69,6 +71,7 @@ static void start(App *a, int k, uint32_t from)
     if (k < 0 || k >= a->count) return;
     if (k != a->cur && !app_load(a, k)) { show(a); return; }
     mixgt_refresh(a);
+    kw_update(a, from, 1);
     shown_pos = from;
     set(G_POS, GTSL_Max, a->len_us / 1000000 + 1);
     set(G_POS, GTSL_Level, from / 1000000);
@@ -93,7 +96,7 @@ int gui_gadtools(App *a)
     fh = scr->Font->ta_YSize;
     top = scr->WBorTop + fh + 1 + 4;
     x0 = scr->WBorLeft + 8;
-    w = 500;
+    w = 600;
     bh = fh + 6;
     lh = fh * 10 + 4;
     NewList(&names);
@@ -109,14 +112,14 @@ int gui_gadtools(App *a)
     g = gad[G_LIST] = CreateGadget(LISTVIEW_KIND, g, &ng, GTLV_ShowSelected, 0, GTLV_Labels, (ULONG)&names, TAG_DONE);
     y += lh + 4;
     {
-        static const char *const txt[7] = {"|<", "Play", "Stop", ">|", "Mixer...", "Open...", "Folder..."};
-        static const WORD bw[7] = {40, 72, 72, 40, 80, 90, 90};
-        static const int ids[7] = {G_PREV, G_PLAY, G_STOP, G_NEXT, G_MIX, G_OPEN, G_FOLDER};
+        static const char *const txt[8] = {"|<", "Play", "Stop", ">|", "Mixer...", "Lyrics...", "Open...", "Folder..."};
+        static const WORD bw[8] = {40, 72, 72, 40, 80, 80, 90, 90};
+        static const int ids[8] = {G_PREV, G_PLAY, G_STOP, G_NEXT, G_MIX, G_LYR, G_OPEN, G_FOLDER};
         WORD x = x0;
         int k;
-        for (k = 0; k < 7; k++) {
+        for (k = 0; k < 8; k++) {
             if (k == 4) x += 12;
-            if (k == 5) x = x0 + w - 184;
+            if (k == 6) x = x0 + w - 184;
             ng.ng_LeftEdge = x; ng.ng_TopEdge = y; ng.ng_Width = bw[k]; ng.ng_Height = bh;
             ng.ng_GadgetText = (UBYTE *)txt[k]; ng.ng_GadgetID = ids[k]; ng.ng_Flags = PLACETEXT_IN;
             g = gad[ids[k]] = CreateGadget(BUTTON_KIND, g, &ng, TAG_DONE);
@@ -174,7 +177,8 @@ int gui_gadtools(App *a)
 
     while (running) {
         struct IntuiMessage *m;
-        ULONG sigs = Wait((1UL << win->UserPort->mp_SigBit) | pl_signal() | mixgt_signal() | SIGBREAKF_CTRL_C);
+        ULONG sigs = Wait((1UL << win->UserPort->mp_SigBit) | pl_signal() | mixgt_signal() | kw_signal() | SIGBREAKF_CTRL_C);
+        if (sigs & kw_signal()) kw_handle(a, app_playing(a) ? a->pl.pos_us : shown_pos);
         if (sigs & mixgt_signal()) {
             mixgt_handle(a);
             if (a->cur >= 0) set(G_POS, GTSL_Max, a->len_us / 1000000 + 1);
@@ -225,6 +229,9 @@ int gui_gadtools(App *a)
                 case G_MIX:
                     mixgt_open(a);
                     break;
+                case G_LYR:
+                    kw_open(a);
+                    break;
                 case G_PREV:
                 case G_NEXT: {
                     int k = a->cur + (src->GadgetID == G_NEXT ? 1 : -1);
@@ -263,6 +270,7 @@ int gui_gadtools(App *a)
     }
     app_stop(a);
     mixgt_close();
+    kw_close();
     CloseWindow(win);
     win = NULL;
     FreeGadgets(glist);
