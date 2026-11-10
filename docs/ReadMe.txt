@@ -20,6 +20,15 @@ XGWorksLite - the window
   Reset      Song's own / XG / GM / GS: a System On before the song
   Output     serial.device (31250 baud) or CAMD (camd.library, link out.0)
 
+  Mixer...   the 16 parts of the song: sound (program, bank MSB / LSB),
+             volume, pan, reverb, chorus, mute (M), solo (S). The values are
+             read from the song's setup; a change is heard at once, also while
+             playing, and wins over the song's own messages.
+             Save into the song writes the changes into the file - over the
+             song's own messages, else as new ones right after its reset (the
+             first save keeps the old file as .bak). Undo goes back to the
+             song's values.
+
   With MUI installed the window is an MUI window; otherwise (or with CLASSIC)
   the classic GadTools window, which needs nothing extra. Keys in the classic
   window: P or Space = play, S = stop, Esc = quit.
