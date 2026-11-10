@@ -66,6 +66,10 @@ XGWorksLite - the window
              bend range); saved with the mixer's Save.
   Lyr.Edit...  the lyrics line by line: click a line, change it, Return.
   Staff...   the notation of a track (grand staff), to read.
+  Jobs...    XGworks' Job menu: Transpose, Velocity / Gate Time Modify,
+             Shift Clock, Sort / Separate Chord, Thin Out, Quantize, Create /
+             Delete Measure, Transpose Chord, Modify Control Data, Stretch
+             Time, Demix by Channel / by Note.
 
   Sound names: copy Melody.ini, SFX.ini, SFX Kit.ini and Drum Kit.ini of
   your XGworks V4.0 into the XG4 folder next to XGWorksLite (else GM names).

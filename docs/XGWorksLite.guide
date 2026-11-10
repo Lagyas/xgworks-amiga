@@ -23,6 +23,7 @@
    @{" Texts (lyrics, chords)" link Texts}
    @{" Lyrics editor         " link LyrEdit}
    @{" Staff                 " link Staff}
+   @{" Jobs                  " link Jobs}
    @{" Sound names (XG4)     " link XG4}
    @{" XGworks songs (.XWS)  " link XWS}
    @{" MIDI output           " link Output}
@@ -67,6 +68,7 @@ previous / next song. At the end of a song the next one starts.
   @{b}XGM...@{ub}      the @{"XGM part editor" link XGM}: sounds by name, XG part parameters
   @{b}Lyr.Edit...@{ub} the @{"Lyrics editor" link LyrEdit}, line by line
   @{b}Staff...@{ub}    the @{"notation" link Staff} of a track
+  @{b}Jobs...@{ub}     the @{"Job menu" link Jobs} of XGworks (and Demix)
   @{b}Lyrics...@{ub}   the @{"karaoke window" link Lyrics}
   @{b}Tracks...@{ub}   the @{"tracks of the song" link Tracks} and their @{"events" link Events}
   @{b}Roll...@{ub}     the @{"Piano Roll" link Roll} of the track selected in Tracks
@@ -296,6 +298,35 @@ flags, dots, sharps and ledger lines; bar lines with their numbers.
 
 @{b}Ch@{ub} shows only one channel; @{b}- / +@{ub} the width. While the song plays the line
 shows the position and the view turns the pages.
+@endnode
+
+@node Jobs "Jobs"
+The jobs of XGworks' Job menu, worked the same way as XGWorks NextGen does
+(checked against it). Choose the job; its settings appear. @{b}Track@{ub} 0 = all
+tracks (the track selected in Tracks is the start value), @{b}From bar / Thru@{ub}
+the range, @{b}Notes from / Thru@{ub} the keys (0-127) for the note jobs. @{b}Do it@{ub} runs
+the job, @{b}Undo@{ub} takes it back.
+
+  Transpose          semitones; notes leaving 0-127 keep their name an
+                     octave lower / higher
+  Velocity Modify    Absolute value, or Relative: value x Rate % + Offset
+  Gate Time Modify   the same for the lengths (clocks)
+  Shift Clock        all events of the range by clocks
+  Sort Chord         the notes of a chord low -> high or high -> low
+  Separate Chord     the k-th note of each chord k x clocks later (strum)
+  Thin Out           of a run of controller / pressure / bend events every
+                     second one goes (the first two and the last stay)
+  Quantize           grid (1/32 ... 1/4, triplets, mixed), strength,
+                     sensitivity, swing with gate / velocity of the swung notes
+  Create Measure     bars of a time signature before a bar; the rest moves
+  Delete Measure     the bars From - Thru and everything in them go
+  Transpose Chord    the XF chords of the range
+  Modify Control Data  one kind of data: set or scale its values; a
+                     controller can become another one
+  Stretch Time       events of the range: from + Offset + (t - from) x %
+  Demix by Channel   a track with several channels into one track each
+  Demix by Note      the notes of Channels (e.g. 10 or 1-16) into one track
+                     per key, named after the drum ("CH 10 - Snare (38)")
 @endnode
 
 @node XG4 "Sound names (XG4)"
