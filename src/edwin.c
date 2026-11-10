@@ -324,6 +324,11 @@ void edw_refresh(App *a)
     }
 }
 
+int edw_selected_track(void)
+{
+    return tw ? tsel : -1;
+}
+
 void edw_position(App *a, uint32_t pos_us)
 {
     (void)a; (void)pos_us;

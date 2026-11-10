@@ -142,6 +142,13 @@ static void send_now(App *a, const uint8_t *m)
     mo_flush();
 }
 
+void app_note(App *a, int ch, int key, int vel)
+{
+    uint8_t m[3];
+    m[0] = (uint8_t)(0x90 | (ch & 15)); m[1] = (uint8_t)(key & 127); m[2] = (uint8_t)(vel & 127);
+    send_now(a, m);
+}
+
 void app_fx(App *a, int what, int value)
 {
     uint8_t m[16];

@@ -405,7 +405,7 @@ void ed_set_channel(EdSong *s, uint32_t trk, int ch)
 /* ---- bars ---- */
 
 /* The time signatures: (tick, beats per bar, ticks per beat), sorted. */
-static int sigs(const EdSong *s, uint32_t *tk, uint32_t *num, uint32_t *bl, int max)
+int ed_sigs(const EdSong *s, uint32_t *tk, uint32_t *num, uint32_t *bl, int max)
 {
     int n = 0;
     uint32_t t, i;
@@ -438,7 +438,7 @@ static int sigs(const EdSong *s, uint32_t *tk, uint32_t *num, uint32_t *bl, int 
 void ed_mbt(const EdSong *s, uint32_t tick, uint32_t *bar, uint32_t *beat, uint32_t *t)
 {
     uint32_t tk[64], num[64], bl[64], b = 1, rem;
-    int n = sigs(s, tk, num, bl, 64), k;
+    int n = ed_sigs(s, tk, num, bl, 64), k;
     for (k = 0; k < n; k++) {
         uint32_t barlen = num[k] * bl[k], until = k + 1 < n ? tk[k + 1] : 0xFFFFFFFFUL;
         if (tick < until || k + 1 == n) {
@@ -457,7 +457,7 @@ void ed_mbt(const EdSong *s, uint32_t tick, uint32_t *bar, uint32_t *beat, uint3
 uint32_t ed_tick_of(const EdSong *s, uint32_t bar, uint32_t beat, uint32_t t)
 {
     uint32_t tk[64], num[64], bl[64], b = 1;
-    int n = sigs(s, tk, num, bl, 64), k;
+    int n = ed_sigs(s, tk, num, bl, 64), k;
     if (bar < 1) bar = 1;
     if (beat < 1) beat = 1;
     for (k = 0; k < n; k++) {
@@ -467,4 +467,17 @@ uint32_t ed_tick_of(const EdSong *s, uint32_t bar, uint32_t beat, uint32_t t)
         b += bars;
     }
     return t;
+}
+
+void ed_sort(EdSong *s, uint32_t trk)
+{
+    EdTrack *t;
+    uint32_t i, j;
+    if (trk >= s->ntrk) return;
+    t = &s->trk[trk];
+    for (i = 1; i < t->n; i++) {
+        EdEv x = t->ev[i];
+        for (j = i; j > 0 && t->ev[j - 1].tick > x.tick; j--) t->ev[j] = t->ev[j - 1];
+        t->ev[j] = x;
+    }
 }

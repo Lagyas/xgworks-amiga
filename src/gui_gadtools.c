@@ -20,10 +20,11 @@
 #include "mixwin.h"
 #include "karawin.h"
 #include "edwin.h"
+#include "pianoroll.h"
 
 struct Library *GadToolsBase;
 
-enum { G_LIST, G_PREV, G_PLAY, G_STOP, G_NEXT, G_MIX, G_LYR, G_TRK, G_OPEN, G_FOLDER, G_POS, G_TIME, G_TEMPO, G_TRANS, G_RESET, G_OUT, G_INFO, G_COUNT };
+enum { G_LIST, G_PREV, G_PLAY, G_STOP, G_NEXT, G_MIX, G_LYR, G_TRK, G_ROLL, G_OPEN, G_FOLDER, G_POS, G_TIME, G_TEMPO, G_TRANS, G_RESET, G_OUT, G_INFO, G_COUNT };
 
 static struct Gadget *gad[G_COUNT];
 static struct Window *win;
@@ -64,6 +65,7 @@ static void show(App *a)
         set(G_POS, GTSL_Level, pos / 1000000);
     }
     kw_update(a, pos, 0);
+    pr_position(a, pos, app_playing(a));
     set(G_INFO, GTTX_Text, (ULONG)a->info);
 }
 
@@ -73,6 +75,7 @@ static void start(App *a, int k, uint32_t from)
     if (k != a->cur && !app_load(a, k)) { show(a); return; }
     mixgt_refresh(a);
     edw_refresh(a);
+    pr_refresh(a);
     kw_update(a, from, 1);
     shown_pos = from;
     set(G_POS, GTSL_Max, a->len_us / 1000000 + 1);
@@ -115,12 +118,12 @@ int gui_gadtools(App *a)
     y += lh + 4;
     {
         /* two rows: playing and files; the windows */
-        static const char *const txt[9] = {"|<", "Play", "Stop", ">|", "Open...", "Folder...", "Mixer...", "Lyrics...", "Tracks..."};
-        static const WORD bw[9] = {40, 72, 72, 40, 90, 90, 90, 90, 90};
-        static const int ids[9] = {G_PREV, G_PLAY, G_STOP, G_NEXT, G_OPEN, G_FOLDER, G_MIX, G_LYR, G_TRK};
+        static const char *const txt[10] = {"|<", "Play", "Stop", ">|", "Open...", "Folder...", "Mixer...", "Lyrics...", "Tracks...", "Roll..."};
+        static const WORD bw[10] = {40, 72, 72, 40, 90, 90, 90, 90, 90, 90};
+        static const int ids[10] = {G_PREV, G_PLAY, G_STOP, G_NEXT, G_OPEN, G_FOLDER, G_MIX, G_LYR, G_TRK, G_ROLL};
         WORD x = x0;
         int k;
-        for (k = 0; k < 9; k++) {
+        for (k = 0; k < 10; k++) {
             if (k == 4) x = x0 + w - 184;
             if (k == 6) { x = x0; y += bh + 4; }
             ng.ng_LeftEdge = x; ng.ng_TopEdge = y; ng.ng_Width = bw[k]; ng.ng_Height = bh;
@@ -180,9 +183,12 @@ int gui_gadtools(App *a)
 
     while (running) {
         struct IntuiMessage *m;
-        ULONG sigs = Wait((1UL << win->UserPort->mp_SigBit) | pl_signal() | mixgt_signal() | kw_signal() | edw_signal() | SIGBREAKF_CTRL_C);
-        if (sigs & edw_signal()) {
-            if (edw_handle(a)) {
+        ULONG sigs = Wait((1UL << win->UserPort->mp_SigBit) | pl_signal() | mixgt_signal() | kw_signal() | edw_signal() | pr_signal() | SIGBREAKF_CTRL_C);
+        if (sigs & (edw_signal() | pr_signal())) {
+            int ch = 0;
+            if (sigs & edw_signal()) { ch = edw_handle(a); if (ch) pr_refresh(a); }
+            if (sigs & pr_signal()) { int c2 = pr_handle(a); if (c2) edw_refresh(a); ch |= c2; }
+            if (ch) {
                 mixgt_refresh(a);
                 if (a->cur >= 0) set(G_POS, GTSL_Max, a->len_us / 1000000 + 1);
                 kw_update(a, shown_pos, 1);
@@ -250,6 +256,10 @@ int gui_gadtools(App *a)
                     edw_tracks_open(a);
                     show(a);
                     break;
+                case G_ROLL:
+                    pr_open(a);
+                    show(a);
+                    break;
                 case G_PREV:
                 case G_NEXT: {
                     int k = a->cur + (src->GadgetID == G_NEXT ? 1 : -1);
@@ -290,6 +300,7 @@ int gui_gadtools(App *a)
     mixgt_close();
     kw_close();
     edw_close_all();
+    pr_close();
     CloseWindow(win);
     win = NULL;
     FreeGadgets(glist);

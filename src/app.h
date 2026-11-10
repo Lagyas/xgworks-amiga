@@ -79,6 +79,8 @@ int  app_ed_commit(App *a);
 int  app_undo(App *a);
 /* Track mute / solo into the player. */
 void app_track_mute(App *a);
+/* A note heard at once (on: velocity, 0 = off), e.g. while drawing notes. */
+void app_note(App *a, int ch, int key, int vel);
 /* How lyrics are written: plain letters, ISO-8859-2 or Latin-1 (rebuilds them). */
 void app_set_letters(App *a, int letters);
 void app_set_tempo(App *a, int pct);

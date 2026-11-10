@@ -13,6 +13,8 @@ unsigned long edw_signal(void);
 int  edw_handle(App *a);
 /* After a song was loaded / changed elsewhere. */
 void edw_refresh(App *a);
+/* The track selected in the Tracks window (-1 = none / closed). */
+int  edw_selected_track(void);
 /* The song position moved (the Event List marks the event there). */
 void edw_position(App *a, uint32_t pos_us);
 

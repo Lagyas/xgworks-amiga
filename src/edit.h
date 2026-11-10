@@ -16,6 +16,7 @@ typedef struct {
     uint32_t len;      /* SysEx / meta: data length */
     uint8_t  st, d1, d2;
     uint8_t  offv;     /* note: 0x80 | velocity of a note-off (0x8n), 0 = note-on velocity 0 */
+    uint8_t  sel;      /* selected in an editor (not saved) */
 } EdEv;
 
 typedef struct {
@@ -44,6 +45,8 @@ int  ed_insert(EdSong *s, uint32_t trk, const EdEv *e);
 void ed_delete(EdSong *s, uint32_t trk, uint32_t i);
 /* Replace event i (moved to its place by time); returns its new index. */
 long ed_replace(EdSong *s, uint32_t trk, uint32_t i, const EdEv *e);
+/* Back into time order after ticks were changed in place (stable). */
+void ed_sort(EdSong *s, uint32_t trk);
 /* Data for a new SysEx / meta event; returns its pool offset (or 0xFFFFFFFF). */
 uint32_t ed_pool_add(EdSong *s, const uint8_t *d, uint32_t n);
 int  ed_add_track(EdSong *s, uint32_t at);
@@ -56,6 +59,8 @@ int  ed_channel(const EdSong *s, uint32_t trk);
 int  ed_set_name(EdSong *s, uint32_t trk, const uint8_t *name, uint32_t len);
 void ed_set_channel(EdSong *s, uint32_t trk, int ch);
 
+/* The time signatures: tick, beats per bar, ticks per beat (sorted; at least one at 0). */
+int  ed_sigs(const EdSong *s, uint32_t *tk, uint32_t *num, uint32_t *bl, int max);
 /* Bars: tick <-> bar (1-), beat (1-), tick in the beat, by the time signatures (FF 58). */
 void ed_mbt(const EdSong *s, uint32_t tick, uint32_t *bar, uint32_t *beat, uint32_t *t);
 uint32_t ed_tick_of(const EdSong *s, uint32_t bar, uint32_t beat, uint32_t t);
