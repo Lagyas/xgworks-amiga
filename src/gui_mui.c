@@ -16,6 +16,9 @@
 #include "drumwin.h"
 #include "lyrwin.h"
 #include "editors.h"
+#include "xgmwin.h"
+#include "lyredwin.h"
+#include "staffwin.h"
 
 struct Library *MUIMasterBase;
 
@@ -23,10 +26,10 @@ struct Library *MUIMasterBase;
 #define MAKE_ID(a, b, c, d) ((ULONG)(a) << 24 | (ULONG)(b) << 16 | (ULONG)(c) << 8 | (ULONG)(d))
 #endif
 
-enum { ID_PLAY = 1, ID_STOP, ID_PREV, ID_NEXT, ID_OPEN, ID_FOLDER, ID_LIST, ID_POS, ID_TEMPO, ID_TRANS, ID_RESET, ID_OUT, ID_MIX, ID_LYR, ID_TRK, ID_ROLL, ID_DRUMS, ID_TEXTS };
+enum { ID_PLAY = 1, ID_STOP, ID_PREV, ID_NEXT, ID_OPEN, ID_FOLDER, ID_LIST, ID_POS, ID_TEMPO, ID_TRANS, ID_RESET, ID_OUT, ID_MIX, ID_LYR, ID_TRK, ID_ROLL, ID_DRUMS, ID_TEXTS, ID_XGM, ID_LYRED, ID_STAFF };
 
 static Object *app, *win, *list, *spos, *ttime, *stempo, *strans, *creset, *cout, *tinfo, *lv;
-static Object *bprev, *bplay, *bstop, *bnext, *bopen, *bdir, *bmix, *blyr, *btrk, *broll, *bdrum, *btext;
+static Object *bprev, *bplay, *bstop, *bnext, *bopen, *bdir, *bmix, *blyr, *btrk, *broll, *bdrum, *btext, *bxgm, *blyred, *bstaff;
 
 static ULONG getv(Object *o, ULONG attr)
 {
@@ -55,7 +58,7 @@ static void show(App *a)
     SetAttrs(ttime, MUIA_Text_Contents, (ULONG)t, TAG_DONE);
     if (app_playing(a)) SetAttrs(spos, MUIA_NoNotify, TRUE, MUIA_Numeric_Value, a->pl.pos_us / 1000000, TAG_DONE);
     kw_update(a, pos, 0);
-    pr_position(a, pos, app_playing(a));
+    eds_position(a, pos, app_playing(a));
     SetAttrs(tinfo, MUIA_Text_Contents, (ULONG)a->info, TAG_DONE);
 }
 
@@ -103,14 +106,21 @@ int gui_mui(App *a)
                     Child, bstop = SimpleButton("_Stop"),
                     Child, bnext = SimpleButton(">|"),
                     Child, HSpace(0),
+                    Child, bopen = SimpleButton("_Open..."),
+                    Child, bdir = SimpleButton("_Folder..."),
+                End,
+                Child, HGroup,
                     Child, bmix = SimpleButton("_Mixer..."),
+                    Child, bxgm = SimpleButton("XG_M..."),
                     Child, blyr = SimpleButton("_Lyrics..."),
+                    Child, blyred = SimpleButton("L_yr.Edit..."),
+                    Child, btext = SimpleButton("Te_xts..."),
+                End,
+                Child, HGroup,
                     Child, btrk = SimpleButton("_Tracks..."),
                     Child, broll = SimpleButton("_Roll..."),
                     Child, bdrum = SimpleButton("_Drums..."),
-                    Child, btext = SimpleButton("Te_xts..."),
-                    Child, bopen = SimpleButton("_Open..."),
-                    Child, bdir = SimpleButton("_Folder..."),
+                    Child, bstaff = SimpleButton("St_aff..."),
                 End,
                 Child, ColGroup(2),
                     Child, Label("Position"),
@@ -139,11 +149,11 @@ int gui_mui(App *a)
         return -1;
     }
     {
-        Object *const btn[12] = {bprev, bplay, bstop, bnext, bopen, bdir, bmix, blyr, btrk, broll, bdrum, btext};
-        static const ULONG ids[12] = {ID_PREV, ID_PLAY, ID_STOP, ID_NEXT, ID_OPEN, ID_FOLDER, ID_MIX, ID_LYR, ID_TRK, ID_ROLL, ID_DRUMS, ID_TEXTS};
+        Object *const btn[15] = {bprev, bplay, bstop, bnext, bopen, bdir, bmix, blyr, btrk, broll, bdrum, btext, bxgm, blyred, bstaff};
+        static const ULONG ids[15] = {ID_PREV, ID_PLAY, ID_STOP, ID_NEXT, ID_OPEN, ID_FOLDER, ID_MIX, ID_LYR, ID_TRK, ID_ROLL, ID_DRUMS, ID_TEXTS, ID_XGM, ID_LYRED, ID_STAFF};
         int k;
         mixmui_create(a, app);
-        for (k = 0; k < 12; k++) DoMethod(btn[k], MUIM_Notify, MUIA_Pressed, FALSE, (ULONG)app, 2, MUIM_Application_ReturnID, ids[k]);
+        for (k = 0; k < 15; k++) DoMethod(btn[k], MUIM_Notify, MUIA_Pressed, FALSE, (ULONG)app, 2, MUIM_Application_ReturnID, ids[k]);
     }
     DoMethod(win, MUIM_Notify, MUIA_Window_CloseRequest, TRUE, (ULONG)app, 2, MUIM_Application_ReturnID, MUIV_Application_ReturnID_Quit);
     DoMethod(lv, MUIM_Notify, MUIA_Listview_DoubleClick, TRUE, (ULONG)app, 2, MUIM_Application_ReturnID, ID_LIST);
@@ -230,6 +240,17 @@ int gui_mui(App *a)
             break;
         case ID_TEXTS:
             lw_open(a);
+            show(a);
+            break;
+        case ID_XGM:
+            xw_open(a);
+            break;
+        case ID_LYRED:
+            yw_open(a);
+            show(a);
+            break;
+        case ID_STAFF:
+            sw_open(a);
             show(a);
             break;
         default:

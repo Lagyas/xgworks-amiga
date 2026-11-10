@@ -14,6 +14,7 @@
 #include "app.h"
 #include "midiout.h"
 #include "xws.h"
+#include "voices.h"
 
 struct Library *AslBase;
 
@@ -101,6 +102,8 @@ int app_init(App *a, const char *folder)
     strcpy(a->folder, "PROGDIR:Songs");
     if (!pl_init(&a->pl)) return 0;
     AslBase = OpenLibrary((CONST_STRPTR)"asl.library", 37);
+    /* sound names from the XGworks voice lists next to the program (if they are there) */
+    vx_load("PROGDIR:XG4");
     app_load_prefs(a);
     if (folder) {
         strncpy(a->folder, folder, sizeof a->folder - 1);
@@ -146,6 +149,18 @@ void app_note(App *a, int ch, int key, int vel)
 {
     uint8_t m[3];
     m[0] = (uint8_t)(0x90 | (ch & 15)); m[1] = (uint8_t)(key & 127); m[2] = (uint8_t)(vel & 127);
+    send_now(a, m);
+}
+
+void app_xp(App *a, int ch, int p, int value)
+{
+    uint8_t m[16];
+    if (ch < 0 || ch > 15 || p < 0 || p >= XP_N) return;
+    if (value < mx_xp[p].min) value = mx_xp[p].min;
+    if (value > mx_xp[p].max) value = mx_xp[p].max;
+    a->mx.xp[ch][p] = (uint8_t)value;
+    a->mx.xptouched[ch][p] = 1;
+    mx_xp_msg(&a->mx, ch, p, m);
     send_now(a, m);
 }
 
@@ -241,6 +256,7 @@ void app_free(App *a)
     free_names(a);
     if (AslBase) CloseLibrary(AslBase);
     AslBase = NULL;
+    vx_free();
 }
 
 int app_load(App *a, int k)

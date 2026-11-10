@@ -35,6 +35,17 @@ char *lt_export(const EdSong *s, int lyr_trk, const char *file, int mode, size_t
  * replace = the old ones go first. Returns lines read; `bad` = lines not understood. */
 int  lt_import(EdSong *s, uint32_t lyr_trk, uint32_t chord_trk, const char *text, size_t n, int replace, int *bad);
 
+/* The lyric lines of a track (the marks as in the karaoke window): idx gets
+ * the lyric event indices in order, lines their ranges in idx. Returns the lines. */
+typedef struct { uint32_t first, n; } LtLine;
+int  lt_lines(const EdSong *s, uint32_t trk, uint32_t *idx, uint32_t maxidx, LtLine *lines, int maxlines);
+/* A line as text: syllables joined ("-" inside a word), marks left out. */
+void lt_line_text(const EdSong *s, uint32_t trk, const uint32_t *idx, const LtLine *ln, char *out, int max, int letters);
+/* A changed line: the same number of syllables keeps their times; else the
+ * syllables go onto the notes of note_trk from the line's start up to the
+ * next line (`next` = its first tick, 0xFFFFFFFF none). Returns the syllables written. */
+int  lt_set_line(EdSong *s, uint32_t trk, const uint32_t *idx, const LtLine *ln, uint32_t next, const char *text, int letters, uint32_t note_trk, int *left);
+
 /* Lyrics and text events without diacritics. Returns how many changed. */
 int  lt_strip_diacritics(EdSong *s);
 

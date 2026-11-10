@@ -68,6 +68,9 @@ static int one(const char *name)
     m.fx.sel[1] = 2; m.fx.touched[FX_CHO] = 1;
     m.fx.ret[0] = 55; m.fx.touched[FX_REVRET] = 1;
     m.fx.ret[1] = 22; m.fx.touched[FX_CHORET] = 1;
+    /* XG part parameters */
+    m.xp[used][XP_CUTOFF] = 90; m.xptouched[used][XP_CUTOFF] = 1;
+    m.xp[used2][XP_ATTACK] = 30; m.xptouched[used2][XP_ATTACK] = 1;
     nb = mx_save(&m, &s, &nsz);
     if (!nb || xg_smf_load(&t, nb, nsz) != XG_OK) { printf("FAIL %s: the saved song cannot be read\n", name); return 1; }
     mx_from_song(&back, &t);
@@ -79,6 +82,10 @@ static int one(const char *name)
             }
     if (back.fx.gs != m.fx.gs || back.fx.sel[0] != 3 || back.fx.sel[1] != 2 || back.fx.ret[0] != 55 || back.fx.ret[1] != 22) {
         printf("FAIL %s: effects %s rev %d/%d cho %d/%d\n", name, back.fx.gs ? "GS" : "XG", back.fx.sel[0], back.fx.ret[0], back.fx.sel[1], back.fx.ret[1]);
+        fail = 1;
+    }
+    if (back.xp[used][XP_CUTOFF] != 90 || back.xp[used2][XP_ATTACK] != 30) {
+        printf("FAIL %s: part parameters cutoff %d attack %d\n", name, back.xp[used][XP_CUTOFF], back.xp[used2][XP_ATTACK]);
         fail = 1;
     }
     A = (uint32_t *)malloc(s.nev * 8 + 8);

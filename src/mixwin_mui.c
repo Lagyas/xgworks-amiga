@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "mixwin.h"
+#include "voices.h"
 
 #ifndef MAKE_ID
 #define MAKE_ID(a, b, c, d) ((ULONG)(a) << 24 | (ULONG)(b) << 16 | (ULONG)(c) << 8 | (ULONG)(d))
@@ -139,7 +140,10 @@ void mixmui_refresh(App *a)
     for (c = 0; c < 16; c++) {
         const uint8_t *v = a->mx.val[c];
         int k;
-        SetAttrs(name[c], MUIA_Text_Contents, (ULONG)(c == 9 && v[MX_MSB] == 0 ? "Drums" : v[MX_MSB] == 127 ? "Drum kit" : mx_gm_names[v[MX_PROG] & 127]), TAG_DONE);
+        {
+            const char *vn = vx_name(v[MX_MSB], v[MX_LSB], v[MX_PROG]);
+            SetAttrs(name[c], MUIA_Text_Contents, (ULONG)(vn ? vn : c == 9 && v[MX_MSB] == 0 ? "Drums" : v[MX_MSB] == 127 ? "Drum kit" : mx_gm_names[v[MX_PROG] & 127]), TAG_DONE);
+        }
         for (k = 0; k < C_MUTE; k++) {
             int val = v[PARAM[k]];
             if (k == C_PROG) val += 1;
@@ -187,7 +191,11 @@ int mixmui_handle(App *a, unsigned long id)
         if (k == C_PROG) v -= 1;
         if (k == C_PAN) v += 64;
         app_mix(a, c, PARAM[k], v);
-        if (k <= C_LSB) SetAttrs(name[c], MUIA_Text_Contents, (ULONG)(a->mx.val[c][MX_MSB] == 127 ? "Drum kit" : mx_gm_names[a->mx.val[c][MX_PROG] & 127]), TAG_DONE);
+        if (k <= C_LSB) {
+            const uint8_t *v = a->mx.val[c];
+            const char *vn = vx_name(v[MX_MSB], v[MX_LSB], v[MX_PROG]);
+            SetAttrs(name[c], MUIA_Text_Contents, (ULONG)(vn ? vn : v[MX_MSB] == 127 ? "Drum kit" : mx_gm_names[v[MX_PROG] & 127]), TAG_DONE);
+        }
     }
     return 1;
 }

@@ -1,4 +1,6 @@
 /* Song texts for the Amiga (see textmap.h). */
+#include <stdio.h>
+#include <stdlib.h>
 #include "textmap.h"
 
 /* Valid UTF-8 with at least one multi-byte letter? */
@@ -80,6 +82,44 @@ size_t tm_to_cp1250(const char *in, uint8_t *out, size_t max, int letters)
         for (k = 0; k < 128; k++)
             if (tm_cp1250[k] == u) break;
         out[o++] = k < 128 ? (uint8_t)(0x80 + k) : (uint8_t)'?';
+    }
+    return o;
+}
+
+size_t tm_from_cp1250_esc(const uint8_t *in, size_t n, char *out, size_t max, int letters)
+{
+    size_t i, o = 0;
+    for (i = 0; i < n && o + 5 < max; i++) {
+        uint8_t c = in[i];
+        char one[8];
+        uint8_t back;
+        if (c == '\\') { out[o++] = '\\'; out[o++] = '\\'; continue; }
+        if (c < 0x80) { out[o++] = (char)c; continue; }
+        if (letters != TM_ASCII && tm_convert(&c, 1, one, sizeof one, letters) == 1 && (uint8_t)one[0] >= 0xA0 &&
+            tm_to_cp1250(one, &back, 1, letters) == 1 && back == c) { out[o++] = one[0]; continue; }
+        o += (size_t)sprintf(out + o, "\\x%02X", c);
+    }
+    out[o] = 0;
+    return o;
+}
+
+size_t tm_to_cp1250_esc(const char *in, uint8_t *out, size_t max, int letters)
+{
+    size_t o = 0;
+    while (*in && o < max) {
+        if (in[0] == '\\' && in[1] == '\\') { out[o++] = '\\'; in += 2; continue; }
+        if (in[0] == '\\' && in[1] == 'x' && in[2] && in[3]) {
+            char hx[3];
+            hx[0] = in[2]; hx[1] = in[3]; hx[2] = 0;
+            out[o++] = (uint8_t)strtol(hx, NULL, 16);
+            in += 4;
+            continue;
+        }
+        {
+            char one[2];
+            one[0] = *in++; one[1] = 0;
+            o += tm_to_cp1250(one, out + o, max - o, letters);
+        }
     }
     return o;
 }

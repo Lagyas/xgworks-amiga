@@ -57,17 +57,12 @@ static void remove_range(EdSong *s, int trk, int chords, uint32_t t0, uint32_t t
 
 /* ---- text onto notes ---- */
 
-int lt_text_to_notes(EdSong *s, uint32_t lyr_trk, uint32_t note_trk, int ch, uint32_t from, const char *text, int letters, int *left)
+/* Text into syllables with their marks ("/" new line, "<" new page at the start, " " at a word end). */
+static int split(const char *text, char syl[][64], int max)
 {
-    /* the syllables, with their marks */
-    char syl[300][64];
-    int nsyl = 0, i, placed = 0;
+    int nsyl = 0, new_line = 0, new_page = 0;
     const char *p = text;
-    int new_line = 0, new_page = 0;
-    uint32_t *starts, nstarts = 0, k, last = 0;
-    *left = 0;
-    if (lyr_trk >= s->ntrk || note_trk >= s->ntrk) return 0;
-    while (*p && nsyl < 300) {
+    while (*p && nsyl < max) {
         char w[64];
         int n = 0;
         /* marks and spaces before a syllable */
@@ -87,13 +82,29 @@ int lt_text_to_notes(EdSong *s, uint32_t lyr_trk, uint32_t note_trk, int ch, uin
         if (new_page) w[n++] = '<';
         else if (new_line && nsyl) w[n++] = '/';
         new_line = new_page = 0;
-        while (*p && *p != ' ' && *p != '\t' && *p != '-' && *p != '/' && *p != '<' && *p != '\r' && *p != '\n' && n < 60) w[n++] = *p++;
+        while (*p && *p != ' ' && *p != '\t' && *p != '-' && *p != '/' && *p != '<' && *p != '\r' && *p != '\n' && n < 58) {
+            /* \- \/ \< are the characters themselves; \\ and \xHH stay for the conversion */
+            if (*p == '\\' && (p[1] == '-' || p[1] == '/' || p[1] == '<')) { w[n++] = p[1]; p += 2; continue; }
+            if (*p == '\\' && p[1] == '\\') { w[n++] = '\\'; w[n++] = '\\'; p += 2; continue; }
+            if (*p == '\\' && p[1] == 'x' && p[2] && p[3]) { memcpy(w + n, p, 4); n += 4; p += 4; continue; }
+            w[n++] = *p++;
+        }
         if (*p == '-') p++;                                /* a syllable of the word: no space */
         else if (!*p || *p == ' ' || *p == '\t' || *p == '\r' || *p == '\n' || *p == '/' || *p == '<') w[n++] = ' ';
         w[n] = 0;
         strcpy(syl[nsyl++], w);
     }
-    if (!nsyl) return 0;
+    return nsyl;
+}
+
+int lt_text_to_notes(EdSong *s, uint32_t lyr_trk, uint32_t note_trk, int ch, uint32_t from, const char *text, int letters, int *left)
+{
+    static char syl[300][64];
+    int nsyl, i, placed = 0;
+    uint32_t *starts, nstarts = 0, k, last = 0;
+    *left = 0;
+    if (lyr_trk >= s->ntrk || note_trk >= s->ntrk) return 0;
+    if (!(nsyl = split(text, syl, 300))) return 0;
     /* the note starts from `from` (a chord counts once) */
     if (!(starts = (uint32_t *)malloc((s->trk[note_trk].n + 1) * sizeof(uint32_t)))) return 0;
     for (k = 0; k < s->trk[note_trk].n; k++) {
@@ -107,7 +118,7 @@ int lt_text_to_notes(EdSong *s, uint32_t lyr_trk, uint32_t note_trk, int ch, uin
     if (nstarts) remove_range(s, (int)lyr_trk, 0, from, last);
     for (i = 0; i < nsyl && (uint32_t)i < nstarts; i++) {
         uint8_t enc[80];
-        size_t n = tm_to_cp1250(syl[i], enc, sizeof enc, letters);
+        size_t n = tm_to_cp1250_esc(syl[i], enc, sizeof enc, letters);
         if (!add_meta(s, lyr_trk, starts[i], 0x05, enc, (uint32_t)n)) break;
         placed++;
     }
@@ -290,6 +301,153 @@ int lt_import(EdSong *s, uint32_t lyr_trk, uint32_t chord_trk, const char *text,
         p = e + 1;
     }
     return lines;
+}
+
+int lt_lines(const EdSong *s, uint32_t trk, uint32_t *idx, uint32_t maxidx, LtLine *lines, int maxlines)
+{
+    uint32_t i, n = 0;
+    int nl = 0, brk = 1;
+    if (trk >= s->ntrk) return 0;
+    for (i = 0; i < s->trk[trk].n && n < maxidx; i++) {
+        const EdEv *e = &s->trk[trk].ev[i];
+        const uint8_t *d = s->pool + e->data;
+        int new_line, end_line;
+        if (!is_lyric(e) || !e->len) continue;
+        new_line = d[0] == '/' || d[0] == '<' || d[0] == '\\';
+        end_line = d[e->len - 1] == '\r' || d[e->len - 1] == '\n' || (e->len > 1 && d[e->len - 1] == '/');
+        if ((new_line || brk) && (nl == 0 || lines[nl - 1].n)) {
+            if (nl == maxlines) break;
+            lines[nl].first = n;
+            lines[nl].n = 0;
+            nl++;
+        }
+        brk = end_line;
+        idx[n++] = i;
+        lines[nl - 1].n++;
+    }
+    return nl;
+}
+
+/* The text of a lyric event without its marks (line / page marks, line ends); its length. */
+static uint32_t core(const EdSong *s, const EdEv *e, uint32_t *start)
+{
+    const uint8_t *d = s->pool + e->data;
+    uint32_t a = 0, l = e->len;
+    while (a < l && (d[a] == '/' || d[a] == '<' || d[a] == '\\')) a++;
+    while (l > a && (d[l - 1] == '\r' || d[l - 1] == '\n' || d[l - 1] == '/')) l--;
+    *start = a;
+    return l - a;
+}
+
+/* The syllables of a line with text (the separators "\r" alone are not syllables). */
+static int real_syllables(const EdSong *s, uint32_t trk, const uint32_t *idx, const LtLine *ln, uint32_t *out)
+{
+    uint32_t j, st;
+    int n = 0;
+    for (j = 0; j < ln->n; j++) {
+        const EdEv *e = &s->trk[trk].ev[idx[ln->first + j]];
+        uint32_t l = core(s, e, &st), k;
+        int text = 0;
+        for (k = 0; k < l; k++) text |= s->pool[e->data + st + k] != ' ';
+        if (text) out[n++] = idx[ln->first + j];
+    }
+    return n;
+}
+
+void lt_line_text(const EdSong *s, uint32_t trk, const uint32_t *idx, const LtLine *ln, char *out, int max, int letters)
+{
+    static uint32_t real[400];
+    int n = real_syllables(s, trk, idx, ln, real), j, o = 0;
+    out[0] = 0;
+    for (j = 0; j < n && j < 400; j++) {
+        const EdEv *e = &s->trk[trk].ev[real[j]];
+        uint32_t st, l = core(s, e, &st);
+        char conv[200];
+        size_t cl = tm_from_cp1250_esc(s->pool + e->data + st, l, conv, sizeof conv, letters), q;
+        if (o + (int)cl * 2 + 2 >= max) break;
+        /* - / < in the text are written \- \/ \< (they are marks when typed) */
+        for (q = 0; q < cl; q++) {
+            if (conv[q] == '-' || conv[q] == '/' || conv[q] == '<') out[o++] = '\\';
+            out[o++] = conv[q];
+        }
+        /* a syllable of a word goes on with "-" */
+        if (j + 1 < n && cl && conv[cl - 1] != ' ') out[o++] = '-';
+    }
+    while (o && out[o - 1] == ' ') o--;
+    out[o] = 0;
+}
+
+int lt_set_line(EdSong *s, uint32_t trk, const uint32_t *idx, const LtLine *ln, uint32_t next, const char *text, int letters, uint32_t note_trk, int *left)
+{
+    static char syl[200][64];
+    static uint32_t real[400];
+    int nsyl, nreal, i, placed = 0;
+    char lead = 0;
+    int tail = 0;
+    uint32_t from, k, *starts = NULL, nstarts = 0;
+    *left = 0;
+    if (trk >= s->ntrk || !ln->n) return 0;
+    nreal = real_syllables(s, trk, idx, ln, real);
+    if (!(nsyl = split(text, syl, 200))) return 0;
+    if (nreal) {
+        /* the marks of the first and the last syllable stay with them */
+        const EdEv *f = &s->trk[trk].ev[real[0]], *l = &s->trk[trk].ev[real[nreal - 1]];
+        const uint8_t *fd = s->pool + f->data, *ld = s->pool + l->data;
+        if (f->len && (fd[0] == '/' || fd[0] == '<' || fd[0] == '\\')) lead = (char)fd[0];
+        if (l->len && (ld[l->len - 1] == '\r' || ld[l->len - 1] == '\n' || (l->len > 1 && ld[l->len - 1] == '/'))) tail = ld[l->len - 1];
+        from = f->tick;
+    } else {
+        from = s->trk[trk].ev[idx[ln->first]].tick;
+    }
+    if (lead && syl[0][0] != '/' && syl[0][0] != '<') {
+        memmove(syl[0] + 1, syl[0], 62);
+        syl[0][0] = lead;
+        syl[0][63] = 0;
+    }
+    {
+        size_t L = strlen(syl[nsyl - 1]);
+        /* the line's last syllable: its own ending (a space only when it had one) */
+        if (nreal) {
+            const EdEv *l = &s->trk[trk].ev[real[nreal - 1]];
+            uint32_t st, cl = core(s, l, &st);
+            int had_space = cl && s->pool[l->data + st + cl - 1] == ' ';
+            if (!had_space && L && syl[nsyl - 1][L - 1] == ' ') syl[nsyl - 1][--L] = 0;
+        }
+        if (tail && L < 62) { syl[nsyl - 1][L] = (char)tail; syl[nsyl - 1][L + 1] = 0; }
+    }
+    if (nsyl == nreal) {
+        /* the same syllables: only the texts change */
+        for (i = 0; i < nsyl; i++) {
+            uint8_t enc[80];
+            size_t n = tm_to_cp1250_esc(syl[i], enc, sizeof enc, letters);
+            uint32_t at = ed_pool_add(s, enc, (uint32_t)n);
+            EdEv *e = &s->trk[trk].ev[real[i]];
+            if (at == 0xFFFFFFFFUL) break;
+            e->data = at;
+            e->len = (uint32_t)n;
+            placed++;
+        }
+        return placed;
+    }
+    /* other syllables: onto the notes of the line */
+    if (note_trk >= s->ntrk || !(starts = (uint32_t *)malloc((s->trk[note_trk].n + 1) * sizeof(uint32_t)))) return 0;
+    for (k = 0; k < s->trk[note_trk].n; k++) {
+        const EdEv *e = &s->trk[note_trk].ev[k];
+        if (e->tick < from || e->tick >= next || !ro_is_note(e, -1)) continue;
+        if (nstarts && starts[nstarts - 1] == e->tick) continue;
+        starts[nstarts++] = e->tick;
+    }
+    /* the old syllables go (from the last: the indices stay right); the separators stay */
+    for (i = nreal; i > 0; i--) ed_delete(s, trk, real[i - 1]);
+    for (i = 0; i < nsyl && (uint32_t)i < nstarts; i++) {
+        uint8_t enc[80];
+        size_t n = tm_to_cp1250_esc(syl[i], enc, sizeof enc, letters);
+        if (!add_meta(s, trk, starts[i], 0x05, enc, (uint32_t)n)) break;
+        placed++;
+    }
+    *left = nsyl - placed;
+    free(starts);
+    return placed;
 }
 
 int lt_strip_diacritics(EdSong *s)

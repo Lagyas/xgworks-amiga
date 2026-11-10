@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "mixwin.h"
+#include "voices.h"
 
 extern struct Library *GadToolsBase;
 
@@ -34,6 +35,8 @@ unsigned long mixgt_signal(void) { return mw ? 1UL << mw->UserPort->mp_SigBit : 
 static const char *sound(const App *a, int c)
 {
     const uint8_t *v = a->mx.val[c];
+    const char *n = vx_name(v[MX_MSB], v[MX_LSB], v[MX_PROG]);
+    if (n) return n;
     if (v[MX_MSB] == 127 || (c == 9 && v[MX_MSB] == 0)) return "Drums";
     return mx_gm_names[v[MX_PROG] & 127];
 }

@@ -21,6 +21,7 @@
 #include "drumops.h"
 #include "rollops.h"
 #include "edwin.h"
+#include "voices.h"
 
 extern struct Library *GadToolsBase;
 
@@ -139,7 +140,10 @@ static void draw(App *a)
     for (r = 0; r < rows && r + rtop < nkeys; r++) {
         int key = keys[r + rtop];
         WORD y = (WORD)(gy0 + r * rh);
-        const char *nm = dr_gm_names[key] ? dr_gm_names[key] : "";
+        /* the kit's own drum names (XGworks voice lists), else GM */
+        int kc = dch < 0 ? 9 : dch, kmsb = a->mx.val[kc][MX_MSB];
+        const char *nm = vx_drum(kmsb >= 126 ? kmsb : 127, a->mx.val[kc][MX_PROG], key);
+        if (!nm) nm = dr_gm_names[key] ? dr_gm_names[key] : "";
         sprintf(txt, "%3d %-18.18s", key, nm);
         SetAPen(rp, pen_tx);
         Move(rp, (WORD)(nx0 + 2), (WORD)(y + 1 + rp->TxBaseline));

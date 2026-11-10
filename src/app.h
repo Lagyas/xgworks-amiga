@@ -66,6 +66,8 @@ void app_mix(App *a, int ch, int param, int value);
 void app_mute(App *a, int ch, int mute, int solo);
 /* Back to the song's own values. */
 void app_mix_reset(App *a);
+/* An XG part parameter (mx_xp), sent at once. */
+void app_xp(App *a, int ch, int p, int value);
 /* An effect setting (FX_REV / FX_CHO: type index, FX_REVRET / FX_CHORET: level), sent at once. */
 void app_fx(App *a, int what, int value);
 /* Write the mixer's values into the song file (song.mid.bak keeps the old one). */

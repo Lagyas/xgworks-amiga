@@ -9,5 +9,7 @@ unsigned long eds_signal(void);
 int  eds_handle(App *a, unsigned long sigs);
 void eds_refresh(App *a);
 void eds_close(void);
+/* The song position for the windows that show it. */
+void eds_position(App *a, uint32_t pos_us, int playing);
 
 #endif

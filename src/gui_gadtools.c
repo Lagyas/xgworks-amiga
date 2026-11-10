@@ -24,10 +24,13 @@
 #include "drumwin.h"
 #include "lyrwin.h"
 #include "editors.h"
+#include "xgmwin.h"
+#include "lyredwin.h"
+#include "staffwin.h"
 
 struct Library *GadToolsBase;
 
-enum { G_LIST, G_PREV, G_PLAY, G_STOP, G_NEXT, G_MIX, G_LYR, G_TRK, G_ROLL, G_DRUMS, G_TEXTS, G_OPEN, G_FOLDER, G_POS, G_TIME, G_TEMPO, G_TRANS, G_RESET, G_OUT, G_INFO, G_COUNT };
+enum { G_LIST, G_PREV, G_PLAY, G_STOP, G_NEXT, G_MIX, G_LYR, G_TRK, G_ROLL, G_DRUMS, G_TEXTS, G_XGM, G_LYRED, G_STAFF, G_OPEN, G_FOLDER, G_POS, G_TIME, G_TEMPO, G_TRANS, G_RESET, G_OUT, G_INFO, G_COUNT };
 
 static struct Gadget *gad[G_COUNT];
 static struct Window *win;
@@ -68,7 +71,7 @@ static void show(App *a)
         set(G_POS, GTSL_Level, pos / 1000000);
     }
     kw_update(a, pos, 0);
-    pr_position(a, pos, app_playing(a));
+    eds_position(a, pos, app_playing(a));
     set(G_INFO, GTTX_Text, (ULONG)a->info);
 }
 
@@ -105,7 +108,7 @@ int gui_gadtools(App *a)
     x0 = scr->WBorLeft + 8;
     w = 600;
     bh = fh + 6;
-    lh = fh * 10 + 4;
+    lh = fh * 8 + 4;
     NewList(&names);
 
     g = CreateContext(&glist);
@@ -120,14 +123,15 @@ int gui_gadtools(App *a)
     y += lh + 4;
     {
         /* two rows: playing and files; the windows */
-        static const char *const txt[12] = {"|<", "Play", "Stop", ">|", "Open...", "Folder...", "Mixer...", "Lyrics...", "Tracks...", "Roll...", "Drums...", "Texts..."};
-        static const WORD bw[12] = {40, 72, 72, 40, 90, 90, 94, 94, 94, 94, 94, 94};
-        static const int ids[12] = {G_PREV, G_PLAY, G_STOP, G_NEXT, G_OPEN, G_FOLDER, G_MIX, G_LYR, G_TRK, G_ROLL, G_DRUMS, G_TEXTS};
+        static const char *const txt[15] = {"|<", "Play", "Stop", ">|", "Open...", "Folder...", "Mixer...", "XGM...", "Lyrics...", "Lyr.Edit...",
+                                            "Texts...", "Tracks...", "Roll...", "Drums...", "Staff..."};
+        static const WORD bw[15] = {40, 72, 72, 40, 90, 90, 114, 114, 114, 114, 114, 114, 114, 114, 114};
+        static const int ids[15] = {G_PREV, G_PLAY, G_STOP, G_NEXT, G_OPEN, G_FOLDER, G_MIX, G_XGM, G_LYR, G_LYRED, G_TEXTS, G_TRK, G_ROLL, G_DRUMS, G_STAFF};
         WORD x = x0;
         int k;
-        for (k = 0; k < 12; k++) {
+        for (k = 0; k < 15; k++) {
             if (k == 4) x = x0 + w - 184;
-            if (k == 6) { x = x0; y += bh + 4; }
+            if (k == 6 || k == 11) { x = x0; y += bh + 4; }
             ng.ng_LeftEdge = x; ng.ng_TopEdge = y; ng.ng_Width = bw[k]; ng.ng_Height = bh;
             ng.ng_GadgetText = (UBYTE *)txt[k]; ng.ng_GadgetID = ids[k]; ng.ng_Flags = PLACETEXT_IN;
             g = gad[ids[k]] = CreateGadget(BUTTON_KIND, g, &ng, TAG_DONE);
@@ -265,6 +269,17 @@ int gui_gadtools(App *a)
                     break;
                 case G_TEXTS:
                     lw_open(a);
+                    show(a);
+                    break;
+                case G_XGM:
+                    xw_open(a);
+                    break;
+                case G_LYRED:
+                    yw_open(a);
+                    show(a);
+                    break;
+                case G_STAFF:
+                    sw_open(a);
                     show(a);
                     break;
                 case G_PREV:

@@ -31,13 +31,54 @@ static const int CC[MX_N] = {7, 10, 91, 93, 0, 32, -1};
 static const uint8_t XGA[MX_N] = {0x0B, 0x0E, 0x13, 0x12, 0x01, 0x02, 0x03};
 static const uint8_t DEF[MX_N] = {100, 64, 40, 0, 0, 0, 0};
 
+/* addr, default, min, max, shown-as offset, name (XG Multi Part, after the XG format specification) */
+const MxXp mx_xp[XP_N] = {
+    {0x08, 64, 40, 88, 64, "Note Shift"},
+    {0x14, 0, 0, 127, 0, "Variation Send"},
+    {0x15, 64, 0, 127, 64, "Vibrato Rate"},
+    {0x16, 64, 0, 127, 64, "Vibrato Depth"},
+    {0x17, 64, 0, 127, 64, "Vibrato Delay"},
+    {0x18, 64, 0, 127, 64, "Cutoff"},
+    {0x19, 64, 0, 127, 64, "Resonance"},
+    {0x1A, 64, 0, 127, 64, "Attack"},
+    {0x1B, 64, 0, 127, 64, "Decay"},
+    {0x1C, 64, 0, 127, 64, "Release"},
+    {0x23, 66, 40, 88, 64, "Bend Range"},
+};
+
+static int xp_of(int addr)
+{
+    int p;
+    for (p = 0; p < XP_N; p++)
+        if (mx_xp[p].addr == addr) return p;
+    return -1;
+}
+
+int mx_xp_msg(const Mixer *m, int ch, int p, uint8_t *o)
+{
+    o[0] = 0xF0; o[1] = 0x43; o[2] = 0x10; o[3] = 0x4C; o[4] = 0x08; o[5] = (uint8_t)ch;
+    o[6] = mx_xp[p].addr; o[7] = m->xp[ch][p]; o[8] = 0xF7;
+    return 9;
+}
+
+/* An XG Multi Part message for one of the part editor's parameters: the parameter (-1 none). */
+static int xg_xp(const uint8_t *d, uint32_t len, int *part, int *val)
+{
+    if (len != 8 || d[0] != 0x43 || (d[1] & 0xF0) != 0x10 || d[2] != 0x4C || d[3] != 0x08 || d[4] > 15) return -1;
+    *part = d[4];
+    *val = d[6];
+    return xp_of(d[5]);
+}
+
 void mx_init(Mixer *m)
 {
     int c, p;
     memset(m, 0, sizeof *m);
     fx_init(&m->fx, 0);
-    for (c = 0; c < 16; c++)
+    for (c = 0; c < 16; c++) {
         for (p = 0; p < MX_N; p++) m->val[c][p] = DEF[p];
+        for (p = 0; p < XP_N; p++) m->xp[c][p] = mx_xp[p].def;
+    }
 }
 
 static int param_of_cc(int cc)
@@ -85,6 +126,7 @@ void mx_from_song(Mixer *m, const XgSong *s)
         int ch, p, v;
         if (e->n == 0) {
             if (e->msg[0] == 0xF0 && (p = xg_part(s->buf + e->off, e->len, &ch, &v)) >= 0 && e->tick <= fn[ch]) m->val[ch][p] = (uint8_t)v;
+            if (e->msg[0] == 0xF0 && (p = xg_xp(s->buf + e->off, e->len, &ch, &v)) >= 0 && e->tick <= fn[ch]) m->xp[ch][p] = (uint8_t)v;
             continue;
         }
         ch = e->msg[0] & 15;
@@ -130,14 +172,20 @@ int mx_any_touched(const Mixer *m)
             if (m->touched[c][p]) return 1;
     for (p = 0; p < FX_N; p++)
         if (m->fx.touched[p]) return 1;
+    for (c = 0; c < 16; c++)
+        for (p = 0; p < XP_N; p++)
+            if (m->xptouched[c][p]) return 1;
     return 0;
 }
 
 int mx_setup_sysex(const Mixer *m, uint8_t out[][16], int len[], int max)
 {
-    int w, n = 0;
+    int w, n = 0, c;
     for (w = 0; w < FX_N && n < max; w++)
         if (m->fx.touched[w]) { len[n] = fx_msg(&m->fx, w, out[n]); n++; }
+    for (c = 0; c < 16; c++)
+        for (w = 0; w < XP_N && n < max; w++)
+            if (m->xptouched[c][w]) { len[n] = mx_xp_msg(m, c, w, out[n]); n++; }
     return n;
 }
 
@@ -157,8 +205,10 @@ int mx_filter(const Mixer *m, const uint8_t *msg, int n, uint8_t *out)
 
 int mx_filter_sysex(const Mixer *m, const uint8_t *data, uint32_t len)
 {
-    int part, val, p = xg_part(data, len, &part, &val);
+    int part, val, p = xg_part(data, len, &part, &val), q = xg_xp(data, len, &part, &val);
     if (!fx_filter_sysex(&m->fx, data, len)) return 0;
+    if (q >= 0 && m->xptouched[part][q]) return 0;
+    p = xg_part(data, len, &part, &val);
     return p < 0 || !m->touched[part][p];
 }
 
@@ -186,12 +236,14 @@ uint8_t *mx_save(const Mixer *m, const XgSong *s, size_t *out_size)
     uint8_t done[16][MX_N], exists[16][MX_N];
     int have_reset = 0, trk_of[16], c, p;
     uint8_t *copy, *res;
-    XgInsert ins[16 * MX_N + FX_N];
+    XgInsert ins[16 * MX_N + FX_N + 16 * XP_N];
+    uint8_t xdone[16][XP_N];
     uint32_t nins = 0;
     if (!(copy = (uint8_t *)malloc(s->size))) return NULL;
     memcpy(copy, s->buf, s->size);
     memset(done, 0, sizeof done);
     memset(exists, 0, sizeof exists);
+    memset(xdone, 0, sizeof xdone);
     first_notes(s, fn);
     for (c = 0; c < 16; c++) trk_of[c] = -1;
     /* over the song's own setup messages (before each channel's first note) */
@@ -202,6 +254,10 @@ uint8_t *mx_save(const Mixer *m, const XgSong *s, size_t *out_size)
             if (e->msg[0] == 0xF0 && xg_is_reset(s->buf + e->off, e->len)) {
                 last_reset = e->tick;
                 have_reset = 1;
+            }
+            if (e->msg[0] == 0xF0 && (p = xg_xp(s->buf + e->off, e->len, &ch, &v)) >= 0 && e->tick <= fn[ch] && m->xptouched[ch][p]) {
+                copy[e->off + 6] = m->xp[ch][p];
+                xdone[ch][p] = 1;
             }
             if (e->msg[0] == 0xF0 && (p = xg_part(s->buf + e->off, e->len, &ch, &v)) >= 0 && e->tick <= fn[ch]) {
                 exists[ch][p] = 1;
@@ -271,6 +327,24 @@ uint8_t *mx_save(const Mixer *m, const XgSong *s, size_t *out_size)
             if (fn[c] < first) first = fn[c];
         if (t > first) t = first;
         fx_save(&m->fx, s, copy, ins, &nins, t, 0);
+        /* the part parameters the song does not set: after the reset, before the part's first note */
+        for (c = 0; c < 16; c++)
+            for (p = 0; p < XP_N; p++) {
+                XgInsert *x;
+                uint8_t msg[16];
+                int n;
+                uint32_t tt = have_reset ? after_reset : 0;
+                if (!m->xptouched[c][p] || xdone[c][p]) continue;
+                if (fn[c] != 0xFFFFFFFFUL && tt > fn[c]) tt = fn[c];
+                n = mx_xp_msg(m, c, p, msg);
+                x = &ins[nins++];
+                x->trk = (uint16_t)(trk_of[c] < 0 ? 0 : trk_of[c]);
+                x->tick = tt;
+                x->b[0] = 0xF0;
+                x->b[1] = (uint8_t)(n - 1);
+                memcpy(x->b + 2, msg + 1, (size_t)(n - 1));
+                x->n = (uint8_t)(n + 1);
+            }
     }
     res = xg_smf_rebuild(s, copy, ins, nins, out_size);
     free(copy);
@@ -286,6 +360,9 @@ void mx_keep_user(Mixer *m, const Mixer *old)
         m->mute[c] = old->mute[c];
         m->solo[c] = old->solo[c];
     }
+    for (c = 0; c < 16; c++)
+        for (p = 0; p < XP_N; p++)
+            if (old->xptouched[c][p]) { m->xp[c][p] = old->xp[c][p]; m->xptouched[c][p] = 1; }
     for (p = 0; p < FX_N; p++)
         if (old->fx.touched[p]) {
             m->fx.touched[p] = 1;

@@ -42,6 +42,33 @@ static void one(const char *name)
     chords = count(&s, 0x7F);
     lyrics = count(&s, 0x05);
     lt = lt_lyrics_track(&s);
+    /* every lyric line written back as it reads: the same syllables */
+    if (lt >= 0) {
+        static uint32_t idx[4000];
+        static LtLine lines[1000];
+        int nl = lt_lines(&s, (uint32_t)lt, idx, 4000, lines, 1000), L, diff = 0, left2;
+        for (L = 0; L < nl; L++) {
+            char txt[400], before[2000], after[2000];
+            uint32_t j;
+            int bo = 0, ao = 0;
+            for (j = 0; j < lines[L].n; j++) {
+                const EdEv *e = &s.trk[lt].ev[idx[lines[L].first + j]];
+                memcpy(before + bo, s.pool + e->data, e->len); bo += (int)e->len; before[bo++] = '|';
+            }
+            lt_line_text(&s, (uint32_t)lt, idx, &lines[L], txt, sizeof txt, TM_LATIN2);
+            lt_set_line(&s, (uint32_t)lt, idx, &lines[L], 0xFFFFFFFFUL, txt, TM_LATIN2, (uint32_t)lt, &left2);
+            for (j = 0; j < lines[L].n; j++) {
+                const EdEv *e = &s.trk[lt].ev[idx[lines[L].first + j]];
+                memcpy(after + ao, s.pool + e->data, e->len); ao += (int)e->len; after[ao++] = '|';
+            }
+            if (bo != ao || memcmp(before, after, (size_t)bo)) {
+                if (diff < 3) { before[bo] = 0; after[ao] = 0; printf("  line %d: [%s] -> [%s]\n", L + 1, before, after); }
+                diff++;
+            }
+        }
+        CHECK(diff == 0, "lyric lines written back changed");
+        if (diff) printf("  %d of %d lines changed\n", diff, nl);
+    }
     /* Midimusic out and back in (replace): the same number of lyrics and chords */
     {
         size_t en;

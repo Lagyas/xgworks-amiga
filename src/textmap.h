@@ -21,5 +21,9 @@ size_t tm_convert(const uint8_t *in, size_t n, char *out, size_t max, int letter
 /* Text typed on the Amiga (letters: how it is written) as Windows-1250 for
  * the song; returns the length. */
 size_t tm_to_cp1250(const char *in, uint8_t *out, size_t max, int letters);
+/* The same with escapes, for text to edit: "\\" is a backslash and "\xHH" a
+ * byte the letters cannot show (Windows-1250 song text <-> Amiga text). */
+size_t tm_from_cp1250_esc(const uint8_t *in, size_t n, char *out, size_t max, int letters);
+size_t tm_to_cp1250_esc(const char *in, uint8_t *out, size_t max, int letters);
 
 #endif
