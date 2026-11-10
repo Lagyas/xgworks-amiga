@@ -30,6 +30,7 @@ jobs:
           cp XGPlay XGWorksLite "out/XGWorks Lite/"
           mkdir -p "out/XGWorks Lite/Songs"
           cp docs/ReadMe.txt "out/XGWorks Lite/ReadMe"
+          cp docs/XGWorksLite.guide "out/XGWorks Lite/"
           cd out && zip -r ../XGWorksLite-amiga.zip "XGWorks Lite"
       - uses: actions/upload-artifact@v4
         with:

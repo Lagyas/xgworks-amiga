@@ -70,17 +70,17 @@ static void drain(Player *p)
 {
     while (p->qr != p->qw) {
         const uint8_t *m = p->q[p->qr % 64];
-        int k = m[0] & 0xF0;
-        mo_msg(m[0], m + 1, (k == 0xC0 || k == 0xD0) ? 1 : 2);
+        mo_msg(m[0], m + 1, p->qn[p->qr % 64] - 1u);
         p->qr++;
     }
     mo_flush();
 }
 
-int pl_queue(Player *p, const uint8_t *msg)
+int pl_queue(Player *p, const uint8_t *msg, int n)
 {
-    if (p->qw - p->qr >= 64) return 0;
-    memcpy(p->q[p->qw % 64], msg, 3);
+    if (p->qw - p->qr >= 64 || n < 1 || n > 16) return 0;
+    memcpy(p->q[p->qw % 64], msg, (size_t)n);
+    p->qn[p->qw % 64] = (uint8_t)n;
     p->qw++;
     Forbid();
     if (p->running && proc) Signal((struct Task *)proc, SIGBREAKF_CTRL_D);
@@ -137,7 +137,11 @@ static void play(Player *p)
     if (p->mixer) {
         uint8_t m[16 * 8][3];
         int k, n = mx_setup(p->mixer, m, 16 * 8);
+        uint8_t sx[FX_N][16];
+        int len[FX_N];
         for (k = 0; k < n; k++) mo_msg(m[k][0], m[k] + 1, (m[k][0] & 0xF0) == 0xC0 ? 1 : 2);
+        n = mx_setup_sysex(p->mixer, sx, len, FX_N);
+        for (k = 0; k < n; k++) mo_msg(0xF0, sx[k] + 1, (uint32_t)len[k] - 1);
     }
     p->qr = p->qw;
     mo_flush();

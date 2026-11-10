@@ -32,6 +32,7 @@ typedef struct {
     Lyrics ly;             /* lyrics and chords of the loaded song */
     int letters;           /* TM_ASCII, TM_LATIN2, TM_LATIN1 */
     int kfont;             /* karaoke text size */
+    int is_xws;            /* the loaded song is an .XWS (saved as .mid) */
 } App;
 
 extern const char *const app_reset_names[RESETS + 1];
@@ -57,12 +58,16 @@ void app_mix(App *a, int ch, int param, int value);
 void app_mute(App *a, int ch, int mute, int solo);
 /* Back to the song's own values. */
 void app_mix_reset(App *a);
+/* An effect setting (FX_REV / FX_CHO: type index, FX_REVRET / FX_CHORET: level), sent at once. */
+void app_fx(App *a, int what, int value);
 /* Write the mixer's values into the song file (song.mid.bak keeps the old one). */
 int  app_save(App *a);
 /* How lyrics are written: plain letters, ISO-8859-2 or Latin-1 (rebuilds them). */
 void app_set_letters(App *a, int letters);
 void app_set_tempo(App *a, int pct);
 void app_set_transpose(App *a, int semis);
+/* The guide (PROGDIR:XGWorksLite.guide) in MultiView, without waiting. */
+void app_help(void);
 /* "m:ss" */
 void app_time(char *out, uint32_t us);
 /* Settings in ENVARC:XGWorksLite.prefs (folder, reset, output, tempo). */

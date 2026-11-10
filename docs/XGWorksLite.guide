@@ -1,0 +1,160 @@
+@database XGWorksLite.guide
+@author "Lagyas"
+@(c) "Lagyas"
+@$VER: XGWorksLite.guide 0.5 (10.11.2026)
+@wordwrap
+
+@node Main "XGWorks Lite"
+
+                         @{b}XGWorks Lite@{ub}
+            MIDI / XG song player for AmigaOS 3.x (68020+)
+
+   @{" Introduction          " link Intro}
+   @{" Starting              " link Start}
+   @{" The main window       " link Main_Window}
+   @{" The mixer             " link Mixer}
+   @{" Effects               " link Effects}
+   @{" Lyrics and chords     " link Lyrics}
+   @{" XGworks songs (.XWS)  " link XWS}
+   @{" MIDI output           " link Output}
+   @{" XGPlay (Shell)        " link XGPlay}
+   @{" Settings              " link Settings}
+
+@endnode
+
+@node Intro "Introduction"
+@{b}XGWorks Lite@{ub} plays Standard MIDI Files (.mid, .kar, format 0 and 1)
+and XGworks songs (.XWS) on a MIDI sound module - Yamaha XG, Roland GS or
+General MIDI - connected to the Amiga through a serial MIDI interface or
+CAMD. It is the little sibling of XGWorks NextGen for Windows / macOS /
+Linux / web and reads songs the same way.
+
+It needs AmigaOS 3.0 or newer and a 68020 or better. MUI is used when it is
+installed; otherwise the classic window (GadTools) needs nothing extra.
+@endnode
+
+@node Start "Starting"
+From Workbench: double click XGWorksLite. Tool types:
+
+  FOLDER=<folder>   the folder of the songs
+  CLASSIC           the classic window even when MUI is installed
+
+From the Shell:
+
+  XGWorksLite [FOLDER] [CLASSIC]
+
+Without a folder the last one is used, else the Songs folder next to the
+program.
+@endnode
+
+@node Main_Window "The main window"
+The list shows the songs of the folder. A double click or @{b}Play@{ub} plays
+the selected song, @{b}Stop@{ub} stops it, @{b}|<@{ub} and @{b}>|@{ub} go to the
+previous / next song. At the end of a song the next one starts.
+
+  @{b}Open...@{ub}     a song from any folder (its folder is shown then)
+  @{b}Folder...@{ub}   another folder of songs
+  @{b}Mixer...@{ub}    the @{"mixer" link Mixer}
+  @{b}Lyrics...@{ub}   the @{"karaoke window" link Lyrics}
+
+  @{b}Position@{ub}    drag to move in the song; what the song sets before that
+              point (sounds, levels, effects) is sent first
+  @{b}Tempo@{ub}       25 - 400 %, also while playing
+  @{b}Transpose@{ub}   -12 .. +12 half-tones, all channels but the drums (10)
+  @{b}Reset@{ub}       Song's own / XG / GM / GS: a System On before the song
+  @{b}Output@{ub}      serial.device or CAMD, see @{"MIDI output" link Output}
+
+Keys in the classic window: P or Space play, S stop, Help this guide, Esc quit.
+@endnode
+
+@node Mixer "The mixer"
+The 16 parts of the song, one row each:
+
+  Sound         the sound name (General MIDI names; "Drums" for drum parts)
+  Prog          program 1 - 128
+  MSB / LSB     bank select (XG: LSB = variation, MSB 127 = drum kit)
+  Volume, Pan, Reverb, Chorus
+  M / S         mute / solo
+
+The values are read from the song: what it sets before each part's first
+note (control changes, program changes and XG Multi Part messages). A
+change is heard at once, also while the song plays, and wins over the
+song's own messages from then on.
+
+@{b}Save into the song@{ub} writes the changes into the file the way XGWorks
+NextGen does: over the song's own messages where it has them, else as new
+messages 100 ms after its reset (and never after the part's first note).
+The first save keeps the old file as <name>.bak. An .XWS song is saved as
+<name>.mid next to it.
+
+@{b}Undo@{ub} goes back to the song's values.
+
+See also @{"Effects" link Effects}.
+@endnode
+
+@node Effects "Effects"
+Under the parts the mixer has the song's reverb and chorus: the type and
+the return level. Which messages are used depends on the song:
+
+  XG  System Effect (Reverb Type 02 01 00, Chorus Type 02 01 20,
+      Return 02 01 0C / 2C)
+  GS  Reverb / Chorus Macro (40 01 30 / 38) and Level (40 01 33 / 3A)
+
+A song with a GS reset or GS effect messages is treated as GS, any other as
+XG. Changes are heard at once and saved into the song like the mixer's.
+@endnode
+
+@node Lyrics "Lyrics and chords"
+The karaoke window shows the chord now (highlighted) and the next ones, the
+line being sung with the sung part highlighted, and the next line.
+
+Lyrics of XF songs (lyric events; "/" new line, "<" new page) and of .kar
+files (text events; "/" and "\" marks) are read. Chords come from the XF
+chord events of the song.
+
+Keys:
+  + / -   text size (helvetica.font from FONTS:, else the screen font)
+  D       the letters: plain (no diacritics, any font), ISO-8859-2 (Czech,
+          Polish, ... with a Central European font) or Latin-1
+  Esc     close
+
+Song texts in Windows-1250 or UTF-8 are converted.
+@endnode
+
+@node XWS "XGworks songs (.XWS)"
+Songs of Yamaha XGworks (.XWS) are listed and played like MIDI files. They
+are read the way XGWorks NextGen exports them to MIDI: one track per
+XGworks track with all its parts at their places. The .XWS file itself is
+never changed; a mixer save writes <name>.mid next to it.
+@endnode
+
+@node Output "MIDI output"
+@{b}serial.device@{ub}: the Amiga's serial port at 31250 baud (MIDI) for the usual
+serial MIDI interfaces. Close other MIDI programs first. Another serial
+device and unit can be set in the settings file (device=, unit=).
+
+@{b}CAMD@{ub}: through camd.library (link out.0; unit= chooses out.<n>), for
+interfaces with a CAMD driver.
+
+In WinUAE / Amiga Forever: route the emulated serial port to a Windows MIDI
+output (IO ports, MIDI).
+@endnode
+
+@node XGPlay "XGPlay (Shell)"
+The player without a window:
+
+  XGPlay FILE/A,RESET/K,DEVICE/K,UNIT/K/N,DUMP/S,QUIET/S
+
+  RESET    XG, GM or GS: a System On before the song
+  DEVICE   the serial device (default serial.device), or CAMD
+  UNIT     its unit (default 0; CAMD: out.<UNIT>)
+  DUMP     print the MIDI messages with their times instead of playing
+  QUIET    no time display
+
+Ctrl+C stops.
+@endnode
+
+@node Settings "Settings"
+Kept in ENVARC:XGWorksLite.prefs (and ENV:): the folder, reset, output,
+device, unit, tempo, the letters and the size of the lyrics.
+@endnode

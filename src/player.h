@@ -26,7 +26,8 @@ typedef struct {
     volatile int ended;        /* reached the end of the song (not stopped) */
     char error[120];           /* why it could not play ("" = fine) */
     /* messages from the window, sent at once (written by the window only) */
-    uint8_t q[64][3];
+    uint8_t q[64][16];
+    uint8_t qn[64];
     volatile uint32_t qw, qr;
 } Player;
 
@@ -38,7 +39,7 @@ void pl_free(Player *p);
 int  pl_start(Player *p);
 /* Stop and wait until the process has ended. */
 void pl_stop(Player *p);
-/* While playing: send a short message as soon as possible; 0 = the queue is full. */
-int  pl_queue(Player *p, const uint8_t *msg);
+/* While playing: send a message (short, or F0 … F7 up to 16 bytes) as soon as possible; 0 = the queue is full. */
+int  pl_queue(Player *p, const uint8_t *msg, int n);
 
 #endif

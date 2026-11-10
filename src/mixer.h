@@ -8,6 +8,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "smf.h"
+#include "fx.h"
 
 enum { MX_VOL, MX_PAN, MX_REV, MX_CHO, MX_MSB, MX_LSB, MX_PROG, MX_N };
 
@@ -16,6 +17,7 @@ typedef struct {
     uint8_t touched[16][MX_N];   /* changed by the user: wins over the song */
     uint8_t mute[16], solo[16];
     uint8_t used[16];            /* the channel has notes */
+    Fx fx;                       /* reverb / chorus of the song */
 } Mixer;
 
 extern const char *const mx_param_names[MX_N];
@@ -33,6 +35,8 @@ int  mx_filter(const Mixer *m, const uint8_t *msg, int n, uint8_t *out);
 int  mx_filter_sysex(const Mixer *m, const uint8_t *data, uint32_t len);
 /* The user's values as messages (sent when playing starts); returns the count. */
 int  mx_setup(const Mixer *m, uint8_t out[][3], int max);
+/* The user's effect settings as SysEx (F0 … F7, length in len[]); returns the count. */
+int  mx_setup_sysex(const Mixer *m, uint8_t out[][16], int len[], int max);
 /* The song with the user's values written in (NULL = no memory). */
 uint8_t *mx_save(const Mixer *m, const XgSong *s, size_t *out_size);
 

@@ -20,10 +20,11 @@ extern struct Library *GadToolsBase;
 enum { C_PROG, C_MSB, C_LSB, C_VOL, C_PAN, C_REV, C_CHO, C_MUTE, C_SOLO, C_NAME, C_N };
 #define G_SAVE (16 * 16)
 #define G_UNDO (G_SAVE + 1)
+#define G_FX (G_SAVE + 10)   /* + what */
 static const int PARAM[C_MUTE] = {MX_PROG, MX_MSB, MX_LSB, MX_VOL, MX_PAN, MX_REV, MX_CHO};
 
 static struct Window *mw;
-static struct Gadget *glist, *g_[16][C_N];
+static struct Gadget *glist, *g_[16][C_N], *gfx[FX_N], *gstd;
 static void *vi;
 static struct Screen *scr;
 
@@ -57,6 +58,16 @@ void mixgt_refresh(App *a)
         GT_SetGadgetAttrs(g_[c][C_MUTE], mw, NULL, GTCB_Checked, a->mx.mute[c], TAG_DONE);
         GT_SetGadgetAttrs(g_[c][C_SOLO], mw, NULL, GTCB_Checked, a->mx.solo[c], TAG_DONE);
     }
+    {
+        const char *const *n;
+        int k;
+        for (k = 0; k < 2; k++) {
+            fx_types(a->mx.fx.gs, k, &n);
+            GT_SetGadgetAttrs(gfx[k], mw, NULL, GTCY_Labels, (ULONG)n, GTCY_Active, a->mx.fx.sel[k], TAG_DONE);
+            GT_SetGadgetAttrs(gfx[2 + k], mw, NULL, GTSL_Level, a->mx.fx.ret[k], TAG_DONE);
+        }
+        GT_SetGadgetAttrs(gstd, mw, NULL, GTTX_Text, (ULONG)(a->mx.fx.gs ? "GS" : "XG"), TAG_DONE);
+    }
 }
 
 int mixgt_open(App *a)
@@ -74,7 +85,7 @@ int mixgt_open(App *a)
     fh = scr->Font->ta_YSize;
     top = scr->WBorTop + fh + 1 + 4;
     x0 = scr->WBorLeft + 6;
-    rh = fh + 4;
+    rh = fh + 3;
     g = CreateContext(&glist);
     memset(&ng, 0, sizeof ng);
     ng.ng_TextAttr = scr->Font;
@@ -100,7 +111,25 @@ int mixgt_open(App *a)
             g = g_[c][k] = CreateGadget(CHECKBOX_KIND, g, &ng, GTCB_Checked, FALSE, GTCB_Scaled, TRUE, TAG_DONE);
         }
     }
-    y += 4;
+    y += 3;
+    {
+        /* effects: reverb type + return, chorus type + return, the standard */
+        const char *const *n;
+        ng.ng_TopEdge = y; ng.ng_Height = fh + 4; ng.ng_Flags = PLACETEXT_LEFT;
+        fx_types(0, 0, &n);
+        ng.ng_LeftEdge = x0 + 56; ng.ng_Width = 120; ng.ng_GadgetText = (UBYTE *)"Reverb"; ng.ng_GadgetID = G_FX + FX_REV;
+        g = gfx[FX_REV] = CreateGadget(CYCLE_KIND, g, &ng, GTCY_Labels, (ULONG)n, TAG_DONE);
+        ng.ng_LeftEdge = x0 + 180; ng.ng_Width = 60; ng.ng_GadgetText = NULL; ng.ng_GadgetID = G_FX + FX_REVRET;
+        g = gfx[FX_REVRET] = CreateGadget(SLIDER_KIND, g, &ng, GTSL_Min, 0, GTSL_Max, 127, GTSL_Level, 64, GA_RelVerify, TRUE, TAG_DONE);
+        fx_types(0, 1, &n);
+        ng.ng_LeftEdge = x0 + 306; ng.ng_Width = 120; ng.ng_GadgetText = (UBYTE *)"Chorus"; ng.ng_GadgetID = G_FX + FX_CHO;
+        g = gfx[FX_CHO] = CreateGadget(CYCLE_KIND, g, &ng, GTCY_Labels, (ULONG)n, TAG_DONE);
+        ng.ng_LeftEdge = x0 + 430; ng.ng_Width = 60; ng.ng_GadgetText = NULL; ng.ng_GadgetID = G_FX + FX_CHORET;
+        g = gfx[FX_CHORET] = CreateGadget(SLIDER_KIND, g, &ng, GTSL_Min, 0, GTSL_Max, 127, GTSL_Level, 64, GA_RelVerify, TRUE, TAG_DONE);
+        ng.ng_LeftEdge = x0 + 500; ng.ng_Width = 30; ng.ng_GadgetID = 0xFFFF;
+        g = gstd = CreateGadget(TEXT_KIND, g, &ng, GTTX_Text, (ULONG)"XG", TAG_DONE);
+        y += fh + 7;
+    }
     ng.ng_TopEdge = y; ng.ng_Height = fh + 6; ng.ng_Flags = PLACETEXT_IN;
     ng.ng_LeftEdge = x0; ng.ng_Width = 180; ng.ng_GadgetText = (UBYTE *)"Save into the song"; ng.ng_GadgetID = G_SAVE;
     g = CreateGadget(BUTTON_KIND, g, &ng, TAG_DONE);
@@ -120,7 +149,7 @@ int mixgt_open(App *a)
         WA_Gadgets, (ULONG)glist,
         WA_DragBar, TRUE, WA_DepthGadget, TRUE, WA_CloseGadget, TRUE, WA_Activate, TRUE,
         WA_PubScreen, (ULONG)scr,
-        WA_IDCMP, IDCMP_CLOSEWINDOW | IDCMP_REFRESHWINDOW | SLIDERIDCMP | INTEGERIDCMP | CHECKBOXIDCMP | BUTTONIDCMP,
+        WA_IDCMP, IDCMP_CLOSEWINDOW | IDCMP_REFRESHWINDOW | SLIDERIDCMP | INTEGERIDCMP | CHECKBOXIDCMP | BUTTONIDCMP | CYCLEIDCMP,
         TAG_DONE);
     UnlockPubScreen(NULL, scr);
     if (!mw) {
@@ -166,6 +195,12 @@ int mixgt_handle(App *a)
         if (cls != IDCMP_GADGETUP && cls != IDCMP_MOUSEMOVE) continue;
         if (src->GadgetID == G_SAVE) { app_save(a); mixgt_refresh(a); continue; }
         if (src->GadgetID == G_UNDO) { app_mix_reset(a); mixgt_refresh(a); continue; }
+        if (src->GadgetID >= G_FX && src->GadgetID < G_FX + FX_N) {
+            int w = src->GadgetID - G_FX;
+            if (w < 2 && cls == IDCMP_GADGETUP) app_fx(a, w, code);
+            else if (w >= 2) app_fx(a, w, (WORD)code);
+            continue;
+        }
         {
             int c = src->GadgetID / 16, k = src->GadgetID % 16, v;
             if (c > 15 || k >= C_NAME) continue;

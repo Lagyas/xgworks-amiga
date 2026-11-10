@@ -3,6 +3,7 @@
 #include <exec/memory.h>
 #include <dos/dos.h>
 #include <dos/exall.h>
+#include <dos/dostags.h>
 #include <libraries/asl.h>
 #include <proto/exec.h>
 #include <proto/dos.h>
@@ -12,6 +13,7 @@
 #include <string.h>
 #include "app.h"
 #include "midiout.h"
+#include "xws.h"
 
 struct Library *AslBase;
 
@@ -38,7 +40,7 @@ static int name_cmp(const void *x, const void *y)
 static int is_song(const char *n)
 {
     const char *d = strrchr(n, '.');
-    return d && (!ci_cmp(d, ".mid") || !ci_cmp(d, ".midi") || !ci_cmp(d, ".kar") || !ci_cmp(d, ".smf"));
+    return d && (!ci_cmp(d, ".mid") || !ci_cmp(d, ".midi") || !ci_cmp(d, ".kar") || !ci_cmp(d, ".smf") || !ci_cmp(d, ".xws"));
 }
 
 static void free_names(App *a)
@@ -120,9 +122,11 @@ static void out_close(App *a)
 
 static void send_now(App *a, const uint8_t *m)
 {
-    int k = m[0] & 0xF0;
+    int k = m[0] & 0xF0, n = 0;
+    if (m[0] == 0xF0) while (n < 16 && m[n++] != 0xF7) {}
+    else n = (k == 0xC0 || k == 0xD0) ? 2 : 3;
     if (app_playing(a)) {
-        pl_queue(&a->pl, m);
+        pl_queue(&a->pl, m, n);
         return;
     }
     if (!a->out_open) {
@@ -134,8 +138,18 @@ static void send_now(App *a, const uint8_t *m)
         }
         a->out_open = 1;
     }
-    mo_msg(m[0], m + 1, (k == 0xC0 || k == 0xD0) ? 1 : 2);
+    mo_msg(m[0], m + 1, (uint32_t)n - 1);
     mo_flush();
+}
+
+void app_fx(App *a, int what, int value)
+{
+    uint8_t m[16];
+    if (what < 2) a->mx.fx.sel[what] = (uint8_t)value;
+    else a->mx.fx.ret[what - 2] = (uint8_t)(value < 0 ? 0 : value > 127 ? 127 : value);
+    a->mx.fx.touched[what] = 1;
+    fx_msg(&a->mx.fx, what, m);
+    send_now(a, m);
 }
 
 void app_mix(App *a, int ch, int param, int value)
@@ -176,6 +190,16 @@ void app_mix_reset(App *a)
     n = mx_setup(&a->mx, m, 16 * 8);
     memset(a->mx.touched, 0, sizeof a->mx.touched);
     for (k = 0; k < n; k++) send_now(a, m[k]);
+    /* the song's effects, for what was changed */
+    {
+        int w;
+        for (w = 0; w < FX_N; w++)
+            if (old.fx.touched[w]) {
+                uint8_t sx[16];
+                fx_msg(&a->mx.fx, w, sx);
+                send_now(a, sx);
+            }
+    }
 }
 
 static void unload(App *a)
@@ -230,6 +254,19 @@ int app_load(App *a, int k)
         free(data);
         snprintf(a->info, sizeof a->info, "%s cannot be read.", a->names[k]);
         return 0;
+    }
+    a->is_xws = xws_is(data, (size_t)size);
+    if (a->is_xws) {
+        /* an XGworks song: read as the MIDI file XGWorks NextGen would export */
+        size_t mn;
+        uint8_t *mid = xws_to_smf(data, (size_t)size, &mn);
+        free(data);
+        if (!mid) {
+            snprintf(a->info, sizeof a->info, "%s: not enough memory.", a->names[k]);
+            return 0;
+        }
+        data = mid;
+        size = (LONG)mn;
     }
     if ((r = xg_smf_load(&a->song, data, (size_t)size)) != XG_OK) {
         free(data);
@@ -328,16 +365,34 @@ int app_save(App *a)
     strncpy(path, a->folder, sizeof path - 1);
     path[sizeof path - 1] = 0;
     AddPart((STRPTR)path, (CONST_STRPTR)a->names[k], sizeof path);
+    if (a->is_xws) {
+        /* an .XWS is kept as it is: the song goes into <name>.mid next to it */
+        char *dot = strrchr(path, '.');
+        if (dot && strlen(dot) == 4) strcpy(dot, ".mid");
+    }
     /* the first save keeps the original as .bak */
     snprintf(bak, sizeof bak, "%s.bak", path);
     if ((l = Lock((CONST_STRPTR)bak, ACCESS_READ))) UnLock(l);
-    else write_file(bak, a->data, a->song.size);
+    else if (!a->is_xws) write_file(bak, a->data, a->song.size);
     if (!write_file(path, nb, n)) {
         free(nb);
         snprintf(a->info, sizeof a->info, "%s cannot be written.", a->names[k]);
         return 0;
     }
     free(nb);
+    if (a->is_xws) {
+        char *n = strrchr(path, '/'), *c = strrchr(path, ':');
+        const char *base = n ? n + 1 : c ? c + 1 : path;
+        char saved[120];
+        strncpy(saved, base, sizeof saved - 1);
+        saved[sizeof saved - 1] = 0;
+        app_scan(a, a->folder);
+        for (k = 0; k < a->count; k++)
+            if (!ci_cmp(a->names[k], saved)) break;
+        if (k >= a->count || !app_load(a, k)) return 0;
+        snprintf(a->info, sizeof a->info, "Saved as %s (the .XWS is unchanged).", saved);
+        return 1;
+    }
     {
         Mixer keep = a->mx;
         a->cur = -1;   /* load it again */
@@ -366,6 +421,14 @@ void app_set_tempo(App *a, int pct)
 void app_set_transpose(App *a, int semis)
 {
     a->pl.transpose = semis < -24 ? -24 : semis > 24 ? 24 : semis;
+}
+
+void app_help(void)
+{
+    BPTR nil = Open((CONST_STRPTR)"NIL:", MODE_NEWFILE);
+    if (SystemTags((CONST_STRPTR)"SYS:Utilities/MultiView PROGDIR:XGWorksLite.guide",
+                   SYS_Asynch, TRUE, SYS_Input, (ULONG)nil, SYS_Output, 0, TAG_DONE) == -1 && nil)
+        Close(nil);
 }
 
 void app_time(char *out, uint32_t us)

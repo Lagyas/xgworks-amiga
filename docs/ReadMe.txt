@@ -1,8 +1,10 @@
 XGWorks Lite for AmigaOS 3.x (68020 or better)
 ==============================================
 
-Plays Standard MIDI Files (.mid / .kar, format 0 / 1) on a MIDI module
-(Yamaha XG, Roland GS, GM) through a serial MIDI interface or CAMD.
+Plays Standard MIDI Files (.mid / .kar, format 0 / 1) and XGworks songs
+(.XWS) on a MIDI module (Yamaha XG, Roland GS, GM) through a serial MIDI
+interface or CAMD. The full help: XGWorksLite.guide (the Help key in the
+window, or MultiView).
 
 XGWorksLite - the window
 ------------------------
@@ -28,6 +30,9 @@ XGWorksLite - the window
              song's own messages, else as new ones right after its reset (the
              first save keeps the old file as .bak). Undo goes back to the
              song's values.
+             Under the parts: the song's reverb and chorus type and return
+             (XG System Effect, or GS macros for a GS song), saved the same way.
+             An .XWS song is saved as <name>.mid next to it.
 
   Lyrics...  the karaoke window: the chord now (highlighted) and the next
              ones, the line being sung with the sung part highlighted, and

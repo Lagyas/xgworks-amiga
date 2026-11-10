@@ -18,8 +18,10 @@
 enum { C_PROG, C_MSB, C_LSB, C_VOL, C_PAN, C_REV, C_CHO, C_MUTE, C_SOLO, C_N };
 #define ID_SAVE (MIXID_BASE + 16 * 16)
 #define ID_UNDO (ID_SAVE + 1)
+#define ID_FX (ID_SAVE + 10)   /* + what (FX_REV …), + 10 for the GS cycles */
 
 static Object *mwin, *name[16], *ctl[16][C_N], *head;
+static Object *fxcyc[2][2], *fxpage[2], *fxret[2], *fxstd;
 static const int PARAM[C_N] = {MX_PROG, MX_MSB, MX_LSB, MX_VOL, MX_PAN, MX_REV, MX_CHO, -1, -1};
 
 static Object *slider(int min, int max, int val)
@@ -37,8 +39,10 @@ void *mixmui_create(App *a, void *mui_app)
 {
     Object *grid, *bsave, *bundo;
     static char nums[16][4];
+    const char *const *xr, *const *xc, *const *gr, *const *gc;
     int c, k;
     (void)a;
+    fx_types(0, 0, &xr); fx_types(0, 1, &xc); fx_types(1, 0, &gr); fx_types(1, 1, &gc);
     grid = ColGroup(C_N + 2),
         Child, Label("Part"), Child, Label("Sound"), Child, Label("Prog"), Child, Label("MSB"), Child, Label("LSB"),
         Child, Label("Volume"), Child, Label("Pan"), Child, Label("Reverb"), Child, Label("Chorus"), Child, Label("M"), Child, Label("S"),
@@ -63,9 +67,24 @@ void *mixmui_create(App *a, void *mui_app)
     mwin = WindowObject,
         MUIA_Window_Title, (ULONG)"XGWorks Lite - Mixer",
         MUIA_Window_ID, MAKE_ID('X', 'G', 'M', 'X'),
+        MUIA_HelpNode, (ULONG)"Mixer",
         WindowContents, VGroup,
             Child, head = TextObject, MUIA_Text_Contents, (ULONG)"", End,
             Child, ScrollgroupObject, MUIA_Scrollgroup_FreeHoriz, FALSE, MUIA_Scrollgroup_Contents, VirtgroupObject, Child, grid, End, End,
+            Child, ColGroup(5), GroupFrameT((ULONG)"Effects"),
+                Child, Label("Reverb"),
+                Child, fxpage[0] = PageGroup, Child, fxcyc[0][0] = CycleObject, MUIA_Cycle_Entries, (ULONG)xr, End,
+                                             Child, fxcyc[1][0] = CycleObject, MUIA_Cycle_Entries, (ULONG)gr, End, End,
+                Child, Label("Return"),
+                Child, fxret[0] = SliderObject, MUIA_Numeric_Min, 0, MUIA_Numeric_Max, 127, MUIA_Numeric_Value, 64, End,
+                Child, fxstd = TextObject, MUIA_Text_Contents, (ULONG)"XG", End,
+                Child, Label("Chorus"),
+                Child, fxpage[1] = PageGroup, Child, fxcyc[0][1] = CycleObject, MUIA_Cycle_Entries, (ULONG)xc, End,
+                                             Child, fxcyc[1][1] = CycleObject, MUIA_Cycle_Entries, (ULONG)gc, End, End,
+                Child, Label("Return"),
+                Child, fxret[1] = SliderObject, MUIA_Numeric_Min, 0, MUIA_Numeric_Max, 127, MUIA_Numeric_Value, 64, End,
+                Child, HSpace(0),
+            End,
             Child, HGroup,
                 Child, bsave = SimpleButton("_Save into the song"),
                 Child, bundo = SimpleButton("_Undo: the song's values"),
@@ -77,6 +96,11 @@ void *mixmui_create(App *a, void *mui_app)
     DoMethod(mwin, MUIM_Notify, MUIA_Window_CloseRequest, TRUE, (ULONG)mwin, 3, MUIM_Set, MUIA_Window_Open, FALSE);
     DoMethod(bsave, MUIM_Notify, MUIA_Pressed, FALSE, (ULONG)mui_app, 2, MUIM_Application_ReturnID, ID_SAVE);
     DoMethod(bundo, MUIM_Notify, MUIA_Pressed, FALSE, (ULONG)mui_app, 2, MUIM_Application_ReturnID, ID_UNDO);
+    for (k = 0; k < 2; k++) {
+        DoMethod(fxcyc[0][k], MUIM_Notify, MUIA_Cycle_Active, MUIV_EveryTime, (ULONG)mui_app, 2, MUIM_Application_ReturnID, ID_FX + k);
+        DoMethod(fxcyc[1][k], MUIM_Notify, MUIA_Cycle_Active, MUIV_EveryTime, (ULONG)mui_app, 2, MUIM_Application_ReturnID, ID_FX + 10 + k);
+        DoMethod(fxret[k], MUIM_Notify, MUIA_Numeric_Value, MUIV_EveryTime, (ULONG)mui_app, 2, MUIM_Application_ReturnID, ID_FX + 2 + k);
+    }
     for (c = 0; c < 16; c++)
         for (k = 0; k < C_N; k++)
             DoMethod(ctl[c][k], MUIM_Notify, k >= C_MUTE ? MUIA_Selected : MUIA_Numeric_Value, MUIV_EveryTime,
@@ -103,6 +127,15 @@ void mixmui_refresh(App *a)
     if (!mwin) return;
     snprintf(h, sizeof h, "%s", a->cur >= 0 ? a->names[a->cur] : "No song loaded");
     SetAttrs(head, MUIA_Text_Contents, (ULONG)h, TAG_DONE);
+    {
+        int k, g = a->mx.fx.gs;
+        SetAttrs(fxstd, MUIA_Text_Contents, (ULONG)(g ? "GS" : "XG"), TAG_DONE);
+        for (k = 0; k < 2; k++) {
+            SetAttrs(fxpage[k], MUIA_Group_ActivePage, g, TAG_DONE);
+            SetAttrs(fxcyc[g][k], MUIA_NoNotify, TRUE, MUIA_Cycle_Active, a->mx.fx.sel[k], TAG_DONE);
+            SetAttrs(fxret[k], MUIA_NoNotify, TRUE, MUIA_Numeric_Value, a->mx.fx.ret[k], TAG_DONE);
+        }
+    }
     for (c = 0; c < 16; c++) {
         const uint8_t *v = a->mx.val[c];
         int k;
@@ -130,6 +163,15 @@ int mixmui_handle(App *a, unsigned long id)
     if (id == ID_UNDO) {
         app_mix_reset(a);
         mixmui_refresh(a);
+        return 1;
+    }
+    if (id >= ID_FX && id < ID_FX + 20) {
+        int w = (int)(id - ID_FX) % 10, g = (int)(id - ID_FX) / 10;
+        if (w < 2) {
+            if (g == a->mx.fx.gs) app_fx(a, w, (int)getv(fxcyc[g][w], MUIA_Cycle_Active));
+        } else {
+            app_fx(a, w, (int)(LONG)getv(fxret[w - 2], MUIA_Numeric_Value));
+        }
         return 1;
     }
     if (id < MIXID_BASE || id >= ID_SAVE) return 0;

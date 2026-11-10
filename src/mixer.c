@@ -35,6 +35,7 @@ void mx_init(Mixer *m)
 {
     int c, p;
     memset(m, 0, sizeof *m);
+    fx_init(&m->fx, 0);
     for (c = 0; c < 16; c++)
         for (p = 0; p < MX_N; p++) m->val[c][p] = DEF[p];
 }
@@ -76,6 +77,7 @@ void mx_from_song(Mixer *m, const XgSong *s)
 {
     uint32_t fn[16], i;
     mx_init(m);
+    fx_from_song(&m->fx, s);
     first_notes(s, fn);
     for (i = 0; i < 16; i++) m->used[i] = fn[i] != 0xFFFFFFFFUL;
     for (i = 0; i < s->nev; i++) {
@@ -126,7 +128,17 @@ int mx_any_touched(const Mixer *m)
     for (c = 0; c < 16; c++)
         for (p = 0; p < MX_N; p++)
             if (m->touched[c][p]) return 1;
+    for (p = 0; p < FX_N; p++)
+        if (m->fx.touched[p]) return 1;
     return 0;
+}
+
+int mx_setup_sysex(const Mixer *m, uint8_t out[][16], int len[], int max)
+{
+    int w, n = 0;
+    for (w = 0; w < FX_N && n < max; w++)
+        if (m->fx.touched[w]) { len[n] = fx_msg(&m->fx, w, out[n]); n++; }
+    return n;
 }
 
 int mx_filter(const Mixer *m, const uint8_t *msg, int n, uint8_t *out)
@@ -146,6 +158,7 @@ int mx_filter(const Mixer *m, const uint8_t *msg, int n, uint8_t *out)
 int mx_filter_sysex(const Mixer *m, const uint8_t *data, uint32_t len)
 {
     int part, val, p = xg_part(data, len, &part, &val);
+    if (!fx_filter_sysex(&m->fx, data, len)) return 0;
     return p < 0 || !m->touched[part][p];
 }
 
@@ -169,11 +182,11 @@ int mx_setup(const Mixer *m, uint8_t out[][3], int max)
 
 uint8_t *mx_save(const Mixer *m, const XgSong *s, size_t *out_size)
 {
-    uint32_t fn[16], last_reset = 0, i;
+    uint32_t fn[16], last_reset = 0, after_reset, i;
     uint8_t done[16][MX_N], exists[16][MX_N];
     int have_reset = 0, trk_of[16], c, p;
     uint8_t *copy, *res;
-    XgInsert ins[16 * MX_N];
+    XgInsert ins[16 * MX_N + FX_N];
     uint32_t nins = 0;
     if (!(copy = (uint8_t *)malloc(s->size))) return NULL;
     memcpy(copy, s->buf, s->size);
@@ -216,9 +229,12 @@ uint8_t *mx_save(const Mixer *m, const XgSong *s, size_t *out_size)
             }
         }
     }
-    /* what the song does not set: new messages after the last reset, before the first note */
+    /* what the song does not set: new messages 100 ms after the last reset (a module
+       needs a moment after a System On), never after the channel's first note */
+    after_reset = xg_us_tick(s, xg_tick_us(s, last_reset) + 100000);
+    /* what the song does not set: new messages there, before the first note */
     for (c = 0; c < 16; c++) {
-        uint32_t t = have_reset ? last_reset + 1 : 0;
+        uint32_t t = have_reset ? after_reset : 0;
         int bank = 0;
         if (fn[c] != 0xFFFFFFFFUL && t > fn[c]) t = fn[c];
         for (p = 0; p < MX_N; p++) {
@@ -247,6 +263,14 @@ uint8_t *mx_save(const Mixer *m, const XgSong *s, size_t *out_size)
                 else { x->n = 3; x->b[0] = (uint8_t)(0xB0 | c); x->b[1] = (uint8_t)CC[p]; x->b[2] = m->val[c][p]; }
             }
         }
+    }
+    /* the effects: after the last reset, before the first note of the song */
+    {
+        uint32_t t = have_reset ? after_reset : 0, first = 0xFFFFFFFFUL;
+        for (c = 0; c < 16; c++)
+            if (fn[c] < first) first = fn[c];
+        if (t > first) t = first;
+        fx_save(&m->fx, s, copy, ins, &nins, t, 0);
     }
     res = xg_smf_rebuild(s, copy, ins, nins, out_size);
     free(copy);

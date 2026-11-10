@@ -63,6 +63,11 @@ static int one(const char *name)
     mx_set(&m, used, MX_CHO, 33, out);
     mx_set(&m, used2, MX_PAN, 21, out);
     mx_set(&m, used2, MX_MSB, 8, out);
+    /* effects: reverb type 3 (XG Room 1 / GS Hall 1), chorus type 2, returns */
+    m.fx.sel[0] = 3; m.fx.touched[FX_REV] = 1;
+    m.fx.sel[1] = 2; m.fx.touched[FX_CHO] = 1;
+    m.fx.ret[0] = 55; m.fx.touched[FX_REVRET] = 1;
+    m.fx.ret[1] = 22; m.fx.touched[FX_CHORET] = 1;
     nb = mx_save(&m, &s, &nsz);
     if (!nb || xg_smf_load(&t, nb, nsz) != XG_OK) { printf("FAIL %s: the saved song cannot be read\n", name); return 1; }
     mx_from_song(&back, &t);
@@ -72,12 +77,16 @@ static int one(const char *name)
                 printf("FAIL %s: ch %d %s = %d, wanted %d\n", name, c + 1, mx_param_names[p], back.val[c][p], m.val[c][p]);
                 fail = 1;
             }
+    if (back.fx.gs != m.fx.gs || back.fx.sel[0] != 3 || back.fx.sel[1] != 2 || back.fx.ret[0] != 55 || back.fx.ret[1] != 22) {
+        printf("FAIL %s: effects %s rev %d/%d cho %d/%d\n", name, back.fx.gs ? "GS" : "XG", back.fx.sel[0], back.fx.ret[0], back.fx.sel[1], back.fx.ret[1]);
+        fail = 1;
+    }
     A = (uint32_t *)malloc(s.nev * 8 + 8);
     B = (uint32_t *)malloc(t.nev * 8 + 8);
     na = notes(&s, A, (int)s.nev);
     nb_ = notes(&t, B, (int)t.nev);
     if (na != nb_ || memcmp(A, B, (size_t)na * 8)) { printf("FAIL %s: the notes changed (%d -> %d)\n", name, na, nb_); fail = 1; }
-    printf("%s %s: ch %d / %d, %lu -> %lu messages (+%ld), %lu -> %lu bytes\n", fail ? "FAIL" : "OK  ", name, used + 1, used2 + 1,
+    printf("%s %s: %s, ch %d / %d, %lu -> %lu messages (+%ld), %lu -> %lu bytes\n", fail ? "FAIL" : "OK  ", name, m.fx.gs ? "GS" : "XG", used + 1, used2 + 1,
            (unsigned long)s.nev, (unsigned long)t.nev, (long)t.nev - (long)s.nev, (unsigned long)sz, (unsigned long)nsz);
     snprintf(outname, sizeof outname, "%s.mixed.mid", name);
     if ((f = fopen(outname, "wb"))) { fwrite(nb, 1, nsz, f); fclose(f); }

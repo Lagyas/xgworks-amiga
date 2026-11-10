@@ -163,7 +163,7 @@ int gui_gadtools(App *a)
         WA_Gadgets, (ULONG)glist,
         WA_DragBar, TRUE, WA_DepthGadget, TRUE, WA_CloseGadget, TRUE, WA_Activate, TRUE,
         WA_PubScreen, (ULONG)scr,
-        WA_IDCMP, IDCMP_CLOSEWINDOW | IDCMP_REFRESHWINDOW | IDCMP_VANILLAKEY | LISTVIEWIDCMP | SLIDERIDCMP | BUTTONIDCMP | CYCLEIDCMP,
+        WA_IDCMP, IDCMP_CLOSEWINDOW | IDCMP_REFRESHWINDOW | IDCMP_VANILLAKEY | IDCMP_RAWKEY | LISTVIEWIDCMP | SLIDERIDCMP | BUTTONIDCMP | CYCLEIDCMP,
         TAG_DONE);
     UnlockPubScreen(NULL, scr);
     if (!win) {
@@ -201,6 +201,9 @@ int gui_gadtools(App *a)
             case IDCMP_REFRESHWINDOW:
                 GT_BeginRefresh(win);
                 GT_EndRefresh(win, TRUE);
+                break;
+            case IDCMP_RAWKEY:
+                if (code == 0x5F) app_help();   /* the Help key */
                 break;
             case IDCMP_VANILLAKEY:
                 if (code == 'p' || code == 'P' || code == ' ') start(a, sel >= 0 ? sel : (a->cur >= 0 ? a->cur : 0), sel == a->cur || sel < 0 ? shown_pos : 0);
