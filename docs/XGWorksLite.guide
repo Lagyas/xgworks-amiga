@@ -146,21 +146,32 @@ with the mixer's @{b}Save@{ub} (XG Multi Part messages: over the song's own, els
 new ones after its reset). The names come from the @{"XG4 voice lists" link XG4}.
 @endnode
 
-@node Lyrics "Lyrics and chords"
-The karaoke window shows the chord now (highlighted) and the next ones, the
-line being sung with the sung part highlighted, and the next line.
+@node Lyrics "Lyrics / Karaoke"
+The lyrics window, laid out like XGWorks NextGen's:
 
-Lyrics of XF songs (lyric events; "/" new line, "<" new page) and of .kar
-files (text events; "/" and "\" marks) are read. Chords come from the XF
-chord events of the song.
+Top: @{b}Track@{ub} (the lyrics track; the one with lyrics is chosen), @{b}A- / A+@{ub}
+text size of the preview, the letters (Plain / ISO-8859-2 / Latin-1),
+@{b}Export... / Import...@{ub} (Midimusic Chord and Lyrics Protocol; Import replaces
+the lyrics), @{b}Clear all@{ub}, @{b}No diacr.@{ub} (lyrics and texts without diacritics).
 
-Keys:
-  + / -   text size (helvetica.font from FONTS:, else the screen font)
-  D       the letters: plain (no diacritics, any font), ISO-8859-2 (Czech,
-          Polish, ... with a Central European font) or Latin-1
-  Esc     close
+Left: every lyric event with its position. A click (or cursor up / down)
+selects it and moves the song there; its text comes into the edit line:
+@{b}Apply@{ub} (or Return) changes it, @{b}Insert@{ub} puts the line in at the song
+position, @{b}Move@{ub} moves the selected one to the song position, @{b}Delete@{ub}.
+A backslash is written \\, a letter the chosen letters lack \xHH.
 
-Song texts in Windows-1250 or UTF-8 are converted.
+Right: the karaoke preview of the page being sung - dark, the sung part
+yellow (on screens with few colours: on a filled background), the chord
+now and the next ones on top. @{b}Pos@{ub} moves the song.
+@{b}Text ... Bar ... Assign@{ub}: the text onto the notes from that bar ("-" between
+syllables, "/" a new line, "<" a new page; the notes of the track selected
+in Tracks / Track View).
+@{b}Fill@{ub}: Fill Lyrics as PSRUTI - the measure / beat / end strings on the beats
+(method: not at lyrics, not in beats with lyrics, not in measures with
+lyrics) and a line end after each measure; @{b}Unfill@{ub} takes them away.
+
+The preview font: helvetica.font from FONTS: (scaled to the size), else
+the screen font.
 @endnode
 
 @node TrackView "Track View"
