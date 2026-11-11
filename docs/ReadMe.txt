@@ -66,6 +66,11 @@ XGWorksLite - the window
              bend range); saved with the mixer's Save.
   Lyr.Edit...  the lyrics line by line: click a line, change it, Return.
   Staff...   the notation of a track (grand staff), to read.
+  New / Close / Save as...  a new song, the song closed, the song as .XWS
+             (an XGworks song with its blocks) or .MID by the name.
+  Track View...  the tracks and their blocks along the bars: select, drag to
+             move (with their events), Create, Repeat, Rename, Delete, Copy /
+             Cut / Paste; double click opens the Piano Roll.
   Jobs...    XGworks' Job menu: Transpose, Velocity / Gate Time Modify,
              Shift Clock, Sort / Separate Chord, Thin Out, Quantize, Create /
              Delete Measure, Transpose Chord, Modify Control Data, Stretch

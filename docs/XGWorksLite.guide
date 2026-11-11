@@ -16,6 +16,7 @@
    @{" Effects               " link Effects}
    @{" XGM part editor       " link XGM}
    @{" Lyrics and chords     " link Lyrics}
+   @{" Track View (blocks)   " link TrackView}
    @{" Tracks                " link Tracks}
    @{" Event List            " link Events}
    @{" Piano Roll            " link Roll}
@@ -62,7 +63,12 @@ The list shows the songs of the folder. A double click or @{b}Play@{ub} plays
 the selected song, @{b}Stop@{ub} stops it, @{b}|<@{ub} and @{b}>|@{ub} go to the
 previous / next song. At the end of a song the next one starts.
 
+  @{b}New@{ub}         a new song (tempo 120, 4/4, one track) as UntitledN.mid
+  @{b}Close@{ub}       the song closed
   @{b}Open...@{ub}     a song from any folder (its folder is shown then)
+  @{b}Save as...@{ub}  the song as another file: name.xws = an XGworks song (with
+              its blocks), else a MIDI file
+  @{b}Track View...@{ub} the @{"tracks and their blocks" link TrackView}
   @{b}Folder...@{ub}   another folder of songs
   @{b}Mixer...@{ub}    the @{"mixer" link Mixer}
   @{b}XGM...@{ub}      the @{"XGM part editor" link XGM}: sounds by name, XG part parameters
@@ -155,6 +161,29 @@ Keys:
   Esc     close
 
 Song texts in Windows-1250 or UTF-8 are converted.
+@endnode
+
+@node TrackView "Track View"
+The tracks one per row - number, name, channel, M (mute) and S (solo), a
+click on M or S switches it - and their blocks along the bars, as in
+XGworks. A block owns the events from its start to the next block's start;
+a MIDI song's track is one block until blocks are made.
+
+  click a block       select it (Shift adds); its name comes into Name
+  drag a block        move it by bars, with its events
+  double click        the Piano Roll of its track
+  click a row         select the track; the bar comes into Bar
+
+  @{b}Bar ... to ... Create@{ub}   a block on the selected track
+  @{b}x n Repeat@{ub}              the selected blocks n times after themselves
+  @{b}Name@{ub}                    (Return) renames the selected blocks
+  @{b}Copy / Cut / Paste@{ub}      blocks with their events; Paste puts them on
+                          the selected track at Bar
+  @{b}Delete@{ub} (or Del)         the selected blocks and their events
+  @{b}- / +@{ub}                   zoom, @{b}Undo@{ub}
+
+An .XWS song keeps its blocks and track settings; Save writes it as .XWS
+again (the first save keeps the old file as .bak).
 @endnode
 
 @node Tracks "Tracks"
@@ -341,10 +370,10 @@ starts; nothing of them is built into XGWorks Lite.
 @endnode
 
 @node XWS "XGworks songs (.XWS)"
-Songs of Yamaha XGworks (.XWS) are listed and played like MIDI files. They
-are read the way XGWorks NextGen exports them to MIDI: one track per
-XGworks track with all its parts at their places. The .XWS file itself is
-never changed; a mixer save writes <name>.mid next to it.
+Songs of Yamaha XGworks (.XWS) are listed, played and edited like MIDI
+files, with their blocks (parts) and track settings. Save writes them as
+.XWS again (as XGWorks NextGen does: one block chunk per block); Save as
+with another name chooses .XWS or MIDI by the name.
 @endnode
 
 @node Output "MIDI output"
