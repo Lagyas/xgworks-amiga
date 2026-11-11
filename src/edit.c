@@ -142,6 +142,7 @@ int ed_load(EdSong *s, const uint8_t *buf, size_t n)
     uint32_t hlen;
     memset(s, 0, sizeof *s);
     if (n < 14 || memcmp(buf, "MThd", 4)) return 0;
+    ed_changed(s);
     hlen = be32(buf + 4);
     s->ppqn = (uint16_t)((buf[12] << 8) | buf[13]);
     if (!s->ppqn || (s->ppqn & 0x8000)) s->ppqn = 480;
@@ -411,7 +412,35 @@ void ed_set_channel(EdSong *s, uint32_t trk, int ch)
 /* ---- bars ---- */
 
 /* The time signatures: (tick, beats per bar, ticks per beat), sorted. */
+static uint32_t gen_counter;
+
+void ed_changed(EdSong *s)
+{
+    s->gen = ++gen_counter;
+}
+
+static int sigs_read(const EdSong *s, uint32_t *tk, uint32_t *num, uint32_t *bl, int max);
+
+/* the time signatures, kept for the same song state (they are asked for very often) */
 int ed_sigs(const EdSong *s, uint32_t *tk, uint32_t *num, uint32_t *bl, int max)
+{
+    static const EdSong *cs;
+    static uint32_t cgen, cn, cpool, ctrk, ctk[64], cnum[64], cbl[64];
+    static int cnt;
+    uint32_t t, total = 0;
+    for (t = 0; t < s->ntrk; t++) total += s->trk[t].n;
+    if (!(cs == s && cgen == s->gen && cn == total && cpool == s->npool && ctrk == s->ntrk && max >= cnt)) {
+        cnt = sigs_read(s, ctk, cnum, cbl, 64);
+        cs = s; cgen = s->gen; cn = total; cpool = s->npool; ctrk = s->ntrk;
+    }
+    if (cnt > max) cnt = max;
+    memcpy(tk, ctk, (size_t)cnt * sizeof(uint32_t));
+    memcpy(num, cnum, (size_t)cnt * sizeof(uint32_t));
+    memcpy(bl, cbl, (size_t)cnt * sizeof(uint32_t));
+    return cnt;
+}
+
+static int sigs_read(const EdSong *s, uint32_t *tk, uint32_t *num, uint32_t *bl, int max)
 {
     int n = 0;
     uint32_t t, i;

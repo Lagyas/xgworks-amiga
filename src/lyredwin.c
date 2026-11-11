@@ -31,7 +31,7 @@ static char (*ytext)[96];
 static uint32_t *yidx;
 static LtLine *ylines;
 static int ynl, ysel = -1, ytrk = -1;
-static char yline[300], yinfo[120];
+static char yline[300], yinfo[120], yshown[300];
 
 int yw_is_open(void) { return yw != NULL; }
 unsigned long yw_signal(void) { return yw ? 1UL << yw->UserPort->mp_SigBit : 0; }
@@ -62,7 +62,7 @@ static void fill(App *a)
                 char t[300];
                 uint32_t bar, beat, tk;
                 ed_mbt(&a->ed, a->ed.trk[ytrk].ev[yidx[ylines[L].first]].tick, &bar, &beat, &tk);
-                lt_line_text(&a->ed, (uint32_t)ytrk, yidx, &ylines[L], t, sizeof t, a->letters);
+                lt_line_text(&a->ed, (uint32_t)ytrk, yidx, &ylines[L], t, sizeof t, a->letters, 0);
                 snprintf(ytext[L], 96, "%03lu:%lu  %s", (unsigned long)bar, (unsigned long)beat, t);
                 ynodes[L].ln_Name = ytext[L];
                 AddTail(&ylist, &ynodes[L]);
@@ -145,6 +145,8 @@ static int apply(App *a)
     int left, n;
     char m[120];
     if (ysel < 0 || ysel >= ynl || ytrk < 0) { info("Click a line first."); return 0; }
+    /* an unchanged line is not written (letters the window cannot show stay) */
+    if (!strcmp(t, yshown)) { info("Not changed."); return 0; }
     next = ysel + 1 < ynl ? a->ed.trk[ytrk].ev[yidx[ylines[ysel + 1].first]].tick : 0xFFFFFFFFUL;
     app_ed_begin(a);
     n = lt_set_line(&a->ed, (uint32_t)ytrk, yidx, &ylines[ysel], next, t, a->letters, (uint32_t)ytrk, &left);
@@ -170,7 +172,8 @@ int yw_handle(App *a)
         case Y_LIST:
             ysel = code;
             if (ysel < ynl) {
-                lt_line_text(&a->ed, (uint32_t)ytrk, yidx, &ylines[ysel], yline, sizeof yline, a->letters);
+                lt_line_text(&a->ed, (uint32_t)ytrk, yidx, &ylines[ysel], yline, sizeof yline, a->letters, 0);
+                strcpy(yshown, yline);
                 GT_SetGadgetAttrs(g_edit, yw, NULL, GTST_String, (ULONG)yline, TAG_DONE);
                 ActivateGadget(g_edit, yw, NULL);
             }

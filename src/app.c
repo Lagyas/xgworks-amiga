@@ -198,7 +198,7 @@ void app_mute(App *a, int ch, int mute, int solo)
 
 void app_mix_reset(App *a)
 {
-    uint8_t m[16 * 8][3];
+    static uint8_t m[16 * 8][3];
     int k, n;
     Mixer old = a->mx;
     if (a->cur < 0) return;
@@ -395,6 +395,7 @@ static int write_file(const char *path, const uint8_t *b, size_t n)
 
 void app_ed_begin(App *a)
 {
+    ed_changed(&a->ed);
     EdSong *u = &a->undo[a->undo_top];
     ed_free(u);
     if (!ed_copy(u, &a->ed)) return;
@@ -405,6 +406,7 @@ void app_ed_begin(App *a)
 /* The song made again from a->ed; the user's mixer values stay. */
 static int rebuild(App *a)
 {
+    ed_changed(&a->ed);
     size_t n;
     uint8_t *nb = ed_save(&a->ed, &n);
     XgSong ns;

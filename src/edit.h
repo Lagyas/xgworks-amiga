@@ -45,7 +45,11 @@ typedef struct {
     uint16_t ppqn;
     uint8_t *pool;
     uint32_t npool, cappool;
+    uint32_t gen;      /* changes when the song is read / changed (ed_changed): caches follow it */
 } EdSong;
+
+/* The song was changed (the time signatures are read again). */
+void ed_changed(EdSong *s);
 
 int  ed_load(EdSong *s, const uint8_t *smf, size_t n);
 /* The song as a format-1 MIDI file (malloc'ed). */

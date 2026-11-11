@@ -136,7 +136,7 @@ static void play(Player *p)
     }
     /* the mixer's values (they win over the song's) */
     if (p->mixer) {
-        uint8_t m[16 * 8][3];
+        static uint8_t m[16 * 8][3];
         int k, n = mx_setup(p->mixer, m, 16 * 8);
         static uint8_t sx[FX_N + 16 * XP_N][16];
         static int len[FX_N + 16 * XP_N];
@@ -207,7 +207,7 @@ int pl_start(Player *p)
     p->running = 1;
     cur = p;
     SetSignal(0, pl_signal());
-    proc = CreateNewProcTags(NP_Entry, (ULONG)entry, NP_Name, (ULONG)"XGWorks Lite player", NP_Priority, 20, NP_StackSize, 8192, TAG_DONE);
+    proc = CreateNewProcTags(NP_Entry, (ULONG)entry, NP_Name, (ULONG)"XGWorks Lite player", NP_Priority, 20, NP_StackSize, 32768, TAG_DONE);
     if (!proc) {
         p->running = 0;
         strcpy(p->error, "the player process cannot start");

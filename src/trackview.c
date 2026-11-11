@@ -113,7 +113,7 @@ static void draw(App *a)
     for (r = 0; r + ttop < (int)a->ed.ntrk; r++) {
         int ti = r + ttop, nb, k, ch;
         WORD y = (WORD)(gy0 + r * rh);
-        EdBlock blks[256];
+        static EdBlock blks[256];
         char nm[44] = "";
         uint32_t len;
         const uint8_t *n;
@@ -178,7 +178,7 @@ static void drag_xor(App *a)
     int k;
     SetDrMd(rp, COMPLEMENT);
     for (k = 0; k < nsel; k++) {
-        EdBlock blks[256];
+        static EdBlock blks[256];
         int nb = bk_view(&a->ed, (uint32_t)sel[k].trk, bar, blks, 256), r = sel[k].trk - ttop;
         WORD y = (WORD)(gy0 + r * rh), x0, x1;
         long st;
@@ -420,7 +420,7 @@ int tv_handle(App *a)
                 int k, n;
                 if (!nsel) { info("Select blocks first."); break; }
                 for (k = 0; k < nsel; k++) {
-                    EdBlock blks[256];
+                    static EdBlock blks[256];
                     int nb = bk_view(&a->ed, (uint32_t)sel[k].trk, bar, blks, 256);
                     if (sel[k].bi >= nb) continue;
                     if (blks[sel[k].bi].start < f) f = blks[sel[k].bi].start;
@@ -498,7 +498,7 @@ int tv_handle(App *a)
         case IDCMP_MOUSEBUTTONS:
             if (code == SELECTDOWN && my >= gy0 && my <= gy1) {
                 int r = (my - gy0) / rh + ttop, nb, k, hit = -1;
-                EdBlock blks[256];
+                static EdBlock blks[256];
                 uint32_t t;
                 if (r >= (int)a->ed.ntrk) break;
                 vtrk = r;

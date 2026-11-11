@@ -135,7 +135,7 @@ int lt_chords_to_bars(EdSong *s, uint32_t trk, uint32_t bar, int step, const cha
     int nsig, placed = 0;
     const char *p = seq;
     uint8_t d[7];
-    struct { uint32_t t; uint8_t d[7]; } list[256];
+    static struct { uint32_t t; uint8_t d[7]; } list[256];
     int nl = 0, i;
     *bad = 0;
     if (trk >= s->ntrk) return 0;
@@ -354,7 +354,7 @@ static int real_syllables(const EdSong *s, uint32_t trk, const uint32_t *idx, co
     return n;
 }
 
-void lt_line_text(const EdSong *s, uint32_t trk, const uint32_t *idx, const LtLine *ln, char *out, int max, int letters)
+void lt_line_text(const EdSong *s, uint32_t trk, const uint32_t *idx, const LtLine *ln, char *out, int max, int letters, int esc)
 {
     static uint32_t real[400];
     int n = real_syllables(s, trk, idx, ln, real), j, o = 0;
@@ -363,7 +363,7 @@ void lt_line_text(const EdSong *s, uint32_t trk, const uint32_t *idx, const LtLi
         const EdEv *e = &s->trk[trk].ev[real[j]];
         uint32_t st, l = core(s, e, &st);
         char conv[200];
-        size_t cl = tm_from_cp1250_esc(s->pool + e->data + st, l, conv, sizeof conv, letters), q;
+        size_t cl = esc ? tm_from_cp1250_esc(s->pool + e->data + st, l, conv, sizeof conv, letters) : tm_convert(s->pool + e->data + st, l, conv, sizeof conv, letters), q;
         if (o + (int)cl * 2 + 2 >= max) break;
         /* - / < in the text are written \- \/ \< (they are marks when typed) */
         for (q = 0; q < cl; q++) {

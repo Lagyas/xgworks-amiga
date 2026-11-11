@@ -23,6 +23,7 @@
 #include <proto/exec.h>
 #include <proto/dos.h>
 static const char version[] = "$VER: XGPlay 0.2 (07.11.2026) XGWorks Lite";
+unsigned long __stack = 32768;
 #endif
 
 static const uint8_t XG_ON[] = {0xF0, 0x43, 0x10, 0x4C, 0x00, 0x00, 0x7E, 0x00, 0xF7};

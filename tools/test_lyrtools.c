@@ -55,7 +55,7 @@ static void one(const char *name)
                 const EdEv *e = &s.trk[lt].ev[idx[lines[L].first + j]];
                 memcpy(before + bo, s.pool + e->data, e->len); bo += (int)e->len; before[bo++] = '|';
             }
-            lt_line_text(&s, (uint32_t)lt, idx, &lines[L], txt, sizeof txt, TM_LATIN2);
+            lt_line_text(&s, (uint32_t)lt, idx, &lines[L], txt, sizeof txt, TM_LATIN2, 1);
             lt_set_line(&s, (uint32_t)lt, idx, &lines[L], 0xFFFFFFFFUL, txt, TM_LATIN2, (uint32_t)lt, &left2);
             for (j = 0; j < lines[L].n; j++) {
                 const EdEv *e = &s.trk[lt].ev[idx[lines[L].first + j]];

@@ -237,7 +237,7 @@ int et_parse(EdSong *s, const char *line, EdEv *e, int ch, int letters, char *er
         return 1;
     }
     if (ieq(kind, "SysEx") || ieq(kind, "Meta")) {
-        uint8_t b[256];
+        static uint8_t b[256];
         int n = 0, meta = ieq(kind, "Meta");
         while (word(&p, w, sizeof w) && n < (int)sizeof b) {
             char *x;

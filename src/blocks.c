@@ -175,7 +175,7 @@ int bk_repeat(EdSong *s, uint32_t from, uint32_t to, uint32_t at, uint32_t count
     int n = 0;
     if (to <= from) return 0;
     for (t = 0; t < s->ntrk; t++) {
-        BkClip clips[64];
+        static BkClip clips[64];
         int nc = 0, c;
         bk_materialize(s, t, bar);
         for (bi = 0; bi < s->trk[t].nblk && nc < 64; bi++) {

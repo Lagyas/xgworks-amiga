@@ -40,7 +40,8 @@ int  lt_import(EdSong *s, uint32_t lyr_trk, uint32_t chord_trk, const char *text
 typedef struct { uint32_t first, n; } LtLine;
 int  lt_lines(const EdSong *s, uint32_t trk, uint32_t *idx, uint32_t maxidx, LtLine *lines, int maxlines);
 /* A line as text: syllables joined ("-" inside a word), marks left out. */
-void lt_line_text(const EdSong *s, uint32_t trk, const uint32_t *idx, const LtLine *ln, char *out, int max, int letters);
+/* esc: a letter the letters lack as \xHH and a backslash as \\ (lossless), else readable */
+void lt_line_text(const EdSong *s, uint32_t trk, const uint32_t *idx, const LtLine *ln, char *out, int max, int letters, int esc);
 /* A changed line: the same number of syllables keeps their times; else the
  * syllables go onto the notes of note_trk from the line's start up to the
  * next line (`next` = its first tick, 0xFFFFFFFF none). Returns the syllables written. */

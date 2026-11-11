@@ -23,6 +23,8 @@ struct GfxBase *GfxBase;
 struct Library *IconBase;
 
 static const char version[] = "$VER: XGWorks Lite 0.2 (07.11.2026)";
+/* the stack (libnix's start code swaps to one this big; the Shell's default of 4 KB is too small) */
+unsigned long __stack = 65536;
 static App app;
 
 /* FOLDER= and CLASSIC from the program's icon. */

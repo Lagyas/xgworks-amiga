@@ -236,7 +236,7 @@ uint8_t *mx_save(const Mixer *m, const XgSong *s, size_t *out_size)
     uint8_t done[16][MX_N], exists[16][MX_N];
     int have_reset = 0, trk_of[16], c, p;
     uint8_t *copy, *res;
-    XgInsert ins[16 * MX_N + FX_N + 16 * XP_N];
+    static XgInsert ins[16 * MX_N + FX_N + 16 * XP_N];
     uint8_t xdone[16][XP_N];
     uint32_t nins = 0;
     if (!(copy = (uint8_t *)malloc(s->size))) return NULL;

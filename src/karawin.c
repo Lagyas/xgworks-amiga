@@ -101,6 +101,28 @@ static uint32_t make_map(App *a)
     return kmapn;
 }
 
+/* a lyric as readable text in the chosen letters (line / page ends as / and <) */
+static void shown_text(App *a, const EdEv *e, char *out, int max)
+{
+    char *p;
+    tm_convert(a->ed.pool + e->data, e->len, out, (size_t)max, a->letters);
+    for (p = out; *p; p++)
+        if (*p == '\r') *p = '/'; else if (*p == '\n') *p = '<';
+}
+
+/* typed text into the song's bytes; "/" at the end and "<" stand for a line / page end */
+static size_t typed_bytes(App *a, const char *in, uint8_t *out, size_t max)
+{
+    char t[300];
+    size_t n = strlen(in);
+    strncpy(t, in, sizeof t - 1);
+    t[sizeof t - 1] = 0;
+    if (n > sizeof t - 1) n = sizeof t - 1;
+    if (n && t[n - 1] == '/') t[n - 1] = '\r';
+    else if (n && t[n - 1] == '<') t[n - 1] = '\n';
+    return tm_to_cp1250(t, out, max, a->letters);
+}
+
 /* ---- drawing ---- */
 
 static void draw_list(App *a)
@@ -120,7 +142,7 @@ static void draw_list(App *a)
             const EdEv *e = &a->ed.trk[t].ev[kmap[k]];
             uint32_t bar, beat, tk;
             ed_mbt(&a->ed, e->tick, &bar, &beat, &tk);
-            tm_from_cp1250_esc(a->ed.pool + e->data, e->len, txt, sizeof txt, a->letters);
+            shown_text(a, e, txt, sizeof txt);
             snprintf(line, sizeof line, "%04lu:%lu:%03lu %s", (unsigned long)bar, (unsigned long)beat, (unsigned long)tk, txt);
         }
         len = (int)strlen(line);
@@ -420,6 +442,9 @@ void kw_close(void)
 static const char *str(struct Gadget *g) { return (const char *)((struct StringInfo *)g->SpecialInfo)->Buffer; }
 static long num(struct Gadget *g) { return ((struct StringInfo *)g->SpecialInfo)->LongInt; }
 
+/* static: the line as it was put into the edit line (to see whether it was changed) */
+static char kshown[300];
+
 static void select_row(App *a, long k)
 {
     int t = lyr_track(a);
@@ -432,7 +457,8 @@ static void select_row(App *a, long k)
     if (ksel >= ktop + krows) ktop = (int)ksel - krows + 1;
     {
         const EdEv *e = &a->ed.trk[t].ev[kmap[ksel]];
-        tm_from_cp1250_esc(a->ed.pool + e->data, e->len, kline, sizeof kline, a->letters);
+        shown_text(a, e, kline, sizeof kline);
+        strcpy(kshown, kline);
         GT_SetGadgetAttrs(g_edit, kw, NULL, GTST_String, (ULONG)kline, TAG_DONE);
         a->locate_us = (long)xg_tick_us(&a->song, e->tick);
     }
@@ -443,7 +469,7 @@ static int add_lyric(App *a, uint32_t tick, const char *text)
 {
     EdEv e;
     uint8_t enc[200];
-    size_t n = tm_to_cp1250_esc(text, enc, sizeof enc, a->letters);
+    size_t n = typed_bytes(a, text, enc, sizeof enc);
     memset(&e, 0, sizeof e);
     e.tick = tick; e.st = 0xFF; e.d1 = 0x05; e.len = (uint32_t)n;
     if ((e.data = ed_pool_add(&a->ed, enc, (uint32_t)n)) == 0xFFFFFFFFUL) return 0;
@@ -524,10 +550,13 @@ int kw_handle(App *a, uint32_t pos_us)
                 break;
             case K_APPLY:
             case K_EDIT:
-                if (ksel >= 0 && ksel < (long)make_map(a)) {
+                if (ksel >= 0 && ksel < (long)make_map(a) && !strcmp(str(g_edit), kshown)) {
+                    info("Not changed.");
+                } else if (ksel >= 0 && ksel < (long)make_map(a)) {
+                    /* only a changed text is written (the letters the window cannot show stay otherwise) */
                     EdEv *e = &a->ed.trk[t].ev[kmap[ksel]];
                     uint8_t enc[200];
-                    size_t n = tm_to_cp1250_esc(str(g_edit), enc, sizeof enc, a->letters);
+                    size_t n = typed_bytes(a, str(g_edit), enc, sizeof enc);
                     uint32_t at;
                     app_ed_begin(a);
                     e = &a->ed.trk[t].ev[kmap[ksel]];
