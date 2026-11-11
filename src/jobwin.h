@@ -5,6 +5,8 @@
 #include "app.h"
 
 int  jw_open(App *a);
+/* With a job chosen (0 Transpose, 13 Demix by Channel, 14 Demix by Note ...). */
+int  jw_open_job(App *a, int job);
 void jw_close(void);
 int  jw_is_open(void);
 unsigned long jw_signal(void);

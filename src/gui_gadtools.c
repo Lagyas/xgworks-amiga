@@ -81,7 +81,11 @@ static void show(App *a)
 static void start(App *a, int k, uint32_t from)
 {
     if (k < 0 || k >= a->count) return;
-    if (k != a->cur && !app_load(a, k)) { show(a); return; }
+    if (k != a->cur) {
+        if (!app_load(a, k)) { show(a); return; }
+        /* a loaded song shows its tracks (as the web / PC main view) */
+        if (!tv_is_open()) tv_open(a);
+    }
     mixgt_refresh(a);
     eds_refresh(a);
     kw_update(a, from, 1);
@@ -212,6 +216,7 @@ int gui_gadtools(App *a)
             }
             show(a);
         }
+        if (a->want_mixer) { a->want_mixer = 0; mixgt_open(a); }
         if (a->locate_us >= 0) {
             /* a window moved the song position */
             uint32_t t = (uint32_t)a->locate_us;

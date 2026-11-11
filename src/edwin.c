@@ -370,6 +370,13 @@ void edw_refresh(App *a)
     }
 }
 
+int edw_events_open(App *a, int trk)
+{
+    if (a->cur < 0 || trk < 0 || (uint32_t)trk >= a->ed.ntrk) return 0;
+    tsel = trk;
+    return ev_open(a, trk);
+}
+
 int edw_selected_track(void)
 {
     return tsel;

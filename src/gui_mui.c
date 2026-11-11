@@ -69,7 +69,11 @@ static void show(App *a)
 static void start(App *a, int k, uint32_t from)
 {
     if (k < 0) return;
-    if (k != a->cur && !app_load(a, k)) { show(a); return; }
+    if (k != a->cur) {
+        if (!app_load(a, k)) { show(a); return; }
+        /* a loaded song shows its tracks (as the web / PC main view) */
+        if (!tv_is_open()) tv_open(a);
+    }
     mixmui_refresh(a);
     eds_refresh(a);
     kw_update(a, from, 1);
@@ -320,6 +324,7 @@ int gui_mui(App *a)
                 }
                 show(a);
             }
+            if (a->want_mixer) { a->want_mixer = 0; mixmui_open(1); }
             if (a->locate_us >= 0) {
                 /* a window moved the song position */
                 uint32_t t = (uint32_t)a->locate_us;

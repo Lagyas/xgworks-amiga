@@ -68,9 +68,12 @@ XGWorksLite - the window
   Staff...   the notation of a track (grand staff), to read.
   New / Close / Save as...  a new song, the song closed, the song as .XWS
              (an XGworks song with its blocks) or .MID by the name.
-  Track View...  the tracks and their blocks along the bars: select, drag to
+  Track View...  opens with every song (as the web main view): Trk, Ch,
+             Name, S, M, Sound and the blocks along the bars: select, drag to
              move (with their events), Create, Repeat, Rename, Delete, Copy /
-             Cut / Paste; double click opens the Piano Roll.
+             Cut / Paste; double click opens the Piano Roll. The right mouse
+             button is the Track menu: the editors, Demix by Channel... and
+             Demix by Note... (the track or all tracks), Transpose..., Jobs.
   Jobs...    XGworks' Job menu: Transpose, Velocity / Gate Time Modify,
              Shift Clock, Sort / Separate Chord, Thin Out, Quantize, Create /
              Delete Measure, Transpose Chord, Modify Control Data, Stretch

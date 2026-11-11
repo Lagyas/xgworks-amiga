@@ -175,10 +175,23 @@ the screen font.
 @endnode
 
 @node TrackView "Track View"
-The tracks one per row - number, name, channel, M (mute) and S (solo), a
-click on M or S switches it - and their blocks along the bars, as in
-XGworks. A block owns the events from its start to the next block's start;
-a MIDI song's track is one block until blocks are made.
+It opens with every loaded song, as the main view of the web / PC
+version. The tracks one per row - Trk, Ch, Name, S (solo), M (mute) and
+Sound (the voice of the channel); a click on S or M switches it - and their
+blocks along the bars, as in XGworks. A block owns the events from its
+start to the next block's start; a MIDI song's track is one block until
+blocks are made.
+
+The @{b}right mouse button@{ub} is the Track menu (for the selected track):
+Piano Roll, Event List, Staff, Drums, Lyrics / Karaoke, Mixer, XGM part
+editor, @{b}Demix by Channel...@{ub}, @{b}Demix by Note...@{ub}, Transpose..., Jobs...
+
+  @{b}Demix by Channel@{ub}  the track's events of each MIDI channel go to a
+                    track of their own (after it)
+  @{b}Demix by Note@{ub}     the notes of the ticked channels go one track per
+                    key (a drum track: one track per instrument, named
+                    after it); the selected track's channel is ticked
+  Both work on the selected track or on all tracks; Undo takes it back.
 
   click a block       select it (Shift adds); its name comes into Name
   drag a block        move it by bars, with its events

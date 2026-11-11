@@ -13,6 +13,8 @@ unsigned long edw_signal(void);
 int  edw_handle(App *a);
 /* After a song was loaded / changed elsewhere. */
 void edw_refresh(App *a);
+/* The Event List of a track. */
+int  edw_events_open(App *a, int trk);
 /* The track selected (in Tracks or the Track View; -1 = none). */
 int  edw_selected_track(void);
 void edw_select_track(App *a, int t);

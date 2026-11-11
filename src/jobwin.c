@@ -179,6 +179,12 @@ static void rebuild(void)
     GT_RefreshWindow(jw, NULL);
 }
 
+int jw_open_job(App *a, int j)
+{
+    job = j;
+    return jw_open(a);
+}
+
 int jw_open(App *a)
 {
     struct Screen *scr;

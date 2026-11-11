@@ -26,6 +26,15 @@
 #include "edwin.h"
 #include "pianoroll.h"
 #include "textmap.h"
+#include "staffwin.h"
+#include "drumwin.h"
+#include "karawin.h"
+#include "xgmwin.h"
+#include "jobwin.h"
+#include "jobs.h"
+#include "voices.h"
+#include "mixer.h"
+#include <libraries/gadtools.h>
 
 extern struct Library *GadToolsBase;
 
@@ -48,9 +57,36 @@ static int drag, drag_trk, drag_bi;
 static WORD dx0, dx1;
 static ULONG cs, cm;
 static char vinfo[120];
+static struct Menu *vmenu;
+static struct TextFont *vmono;
+/* the Demix dialog */
+static struct Window *dmw;
+static struct Gadget *dmgl, *dm_scope, *dm_ch[16];
+static void *dmvi;
+static int dm_by_note, dm_all;
+static App *dm_app;
+
+/* the Track menu (the right mouse button), as the web / PC version's track menu */
+enum { M_ROLL = 1, M_LIST, M_STAFF, M_DRUMS, M_LYRICS, M_MIXER, M_XGM, M_DEMIXCH, M_DEMIXNOTE, M_TRANSPOSE, M_JOBS };
+static struct NewMenu nm[] = {
+    {NM_TITLE, (STRPTR)"Track", NULL, 0, 0, NULL},
+    {NM_ITEM, (STRPTR)"Piano Roll", (STRPTR)"R", 0, 0, (APTR)M_ROLL},
+    {NM_ITEM, (STRPTR)"Event List", (STRPTR)"L", 0, 0, (APTR)M_LIST},
+    {NM_ITEM, (STRPTR)"Staff", (STRPTR)"S", 0, 0, (APTR)M_STAFF},
+    {NM_ITEM, (STRPTR)"Drums", (STRPTR)"D", 0, 0, (APTR)M_DRUMS},
+    {NM_ITEM, (STRPTR)"Lyrics / Karaoke", (STRPTR)"Y", 0, 0, (APTR)M_LYRICS},
+    {NM_ITEM, (STRPTR)"Mixer", (STRPTR)"M", 0, 0, (APTR)M_MIXER},
+    {NM_ITEM, (STRPTR)"XGM part editor", (STRPTR)"X", 0, 0, (APTR)M_XGM},
+    {NM_ITEM, NM_BARLABEL, NULL, 0, 0, NULL},
+    {NM_ITEM, (STRPTR)"Demix by Channel...", NULL, 0, 0, (APTR)M_DEMIXCH},
+    {NM_ITEM, (STRPTR)"Demix by Note...", NULL, 0, 0, (APTR)M_DEMIXNOTE},
+    {NM_ITEM, (STRPTR)"Transpose...", (STRPTR)"T", 0, 0, (APTR)M_TRANSPOSE},
+    {NM_ITEM, (STRPTR)"Jobs...", (STRPTR)"J", 0, 0, (APTR)M_JOBS},
+    {NM_END, NULL, NULL, 0, 0, NULL},
+};
 
 int tv_is_open(void) { return vw != NULL; }
-unsigned long tv_signal(void) { return vw ? 1UL << vw->UserPort->mp_SigBit : 0; }
+unsigned long tv_signal(void) { return (vw ? 1UL << vw->UserPort->mp_SigBit : 0) | (dmw ? 1UL << dmw->UserPort->mp_SigBit : 0); }
 
 static uint32_t bar_ticks(App *a)
 {
@@ -80,7 +116,7 @@ static void layout(void)
 {
     rh = (WORD)(vw->RPort->TxHeight + 5);
     cx0 = vw->BorderLeft;
-    gx0 = (WORD)(cx0 + 150);
+    gx0 = (WORD)(cx0 + 36 * (vmono ? vmono->tf_XSize : 8) + 6);
     gx1 = (WORD)(vw->Width - vw->BorderRight - 1);
     gy0 = (WORD)(tb + vw->RPort->TxHeight + 4);
     gy1 = (WORD)(vw->Height - vw->BorderBottom - 1);
@@ -99,6 +135,12 @@ static void draw(App *a)
     SetAPen(rp, pen_bg);
     RectFill(rp, cx0, tb, gx1, gy1);
     endt = tx(a, gx1);
+    /* the column heads (as the web version's Track View) */
+    if (vmono) SetFont(rp, vmono);
+    SetAPen(rp, pen_tx);
+    Move(rp, (WORD)(cx0 + 2), (WORD)(tb + rp->TxBaseline));
+    Text(rp, (CONST_STRPTR)"Trk Ch Name         S M Sound", 29);
+    SetFont(rp, vw->WScreen->RastPort.Font);
     /* bar numbers */
     for (b0 = htop / bar; b0 * bar <= endt; b0++) {
         WORD x = xt(a, b0 * bar);
@@ -123,11 +165,22 @@ static void draw(App *a)
         n = ed_name(&a->ed, (uint32_t)ti, &len);
         if (n) tm_convert(n, len > 40 ? 40 : len, nm, sizeof nm, a->letters);
         ch = ed_channel(&a->ed, (uint32_t)ti);
-        snprintf(txt, sizeof txt, "%2d %-11.11s %2s %c%c", ti + 1, nm, ch < 0 ? "-" : "", a->ed.trk[ti].mute ? 'M' : '.', a->ed.trk[ti].solo ? 'S' : '.');
-        if (ch >= 0) { char c2[4]; sprintf(c2, "%2d", ch + 1); memcpy(txt + 15, c2, 2); }
+        {
+            /* Trk Ch Name S M Sound */
+            char chs[4], snd[44] = "";
+            if (ch >= 0) {
+                const uint8_t *v = a->mx.val[ch];
+                const char *vn = vx_name(v[MX_MSB], v[MX_LSB], v[MX_PROG]);
+                sprintf(chs, "%2d", ch + 1);
+                snprintf(snd, sizeof snd, "%s", vn ? vn : (ch == 9 || v[MX_MSB] >= 126) ? "Drums" : mx_gm_names[v[MX_PROG] & 127]);
+            } else strcpy(chs, " -");
+            snprintf(txt, sizeof txt, "%3d %s %-12.12s %c %c %-12.12s", ti + 1, chs, nm, a->ed.trk[ti].solo ? 'S' : '.', a->ed.trk[ti].mute ? 'M' : '.', snd);
+        }
+        if (vmono) SetFont(rp, vmono);
         SetAPen(rp, ti == vtrk ? pen_sh : pen_tx);
         Move(rp, (WORD)(cx0 + 2), (WORD)(y + 2 + rp->TxBaseline));
         Text(rp, (CONST_STRPTR)txt, strlen(txt));
+        SetFont(rp, vw->WScreen->RastPort.Font);
         /* bar lines of the row */
         SetAPen(rp, pen_sh);
         for (b0 = htop / bar; b0 * bar <= endt; b0++) {
@@ -211,6 +264,11 @@ int tv_open(App *a)
     }
     vvi = GetVisualInfo(scr, TAG_DONE);
     fh = scr->Font->ta_YSize;
+    {
+        struct TextAttr ta;
+        ta.ta_Name = (STRPTR)"topaz.font"; ta.ta_YSize = 8; ta.ta_Style = 0; ta.ta_Flags = 0;
+        if (!vmono) vmono = OpenFont(&ta);
+    }
     y = (WORD)(scr->WBorTop + fh + 1 + 2);
     memset(&ng, 0, sizeof ng);
     ng.ng_TextAttr = scr->Font;
@@ -249,7 +307,7 @@ int tv_open(App *a)
             x += bw[k] + 4;
         }
         ng.ng_LeftEdge = x + 4; ng.ng_Width = 240; ng.ng_GadgetText = NULL; ng.ng_GadgetID = V_INFO;
-        g = g_info = CreateGadget(TEXT_KIND, g, &ng, GTTX_Text, (ULONG)"Paste goes to the selected track at Bar.", GTTX_Border, TRUE, TAG_DONE);
+        g = g_info = CreateGadget(TEXT_KIND, g, &ng, GTTX_Text, (ULONG)"Right mouse button: the Track menu (editors, Demix).", GTTX_Border, TRUE, TAG_DONE);
     }
     tb = (WORD)(y + fh + 7);
     if (!g) { FreeGadgets(vgl); vgl = NULL; FreeVisualInfo(vvi); UnlockPubScreen(NULL, scr); return 0; }
@@ -259,9 +317,14 @@ int tv_open(App *a)
         WA_Gadgets, (ULONG)vgl, WA_DragBar, TRUE, WA_DepthGadget, TRUE, WA_CloseGadget, TRUE, WA_SizeGadget, TRUE,
         WA_SizeBBottom, TRUE, WA_SizeBRight, TRUE, WA_Activate, TRUE, WA_SimpleRefresh, TRUE, WA_PubScreen, (ULONG)scr,
         WA_IDCMP, IDCMP_CLOSEWINDOW | IDCMP_NEWSIZE | IDCMP_REFRESHWINDOW | IDCMP_MOUSEBUTTONS | IDCMP_MOUSEMOVE | IDCMP_RAWKEY |
-                  IDCMP_IDCMPUPDATE | IDCMP_GADGETUP | INTEGERIDCMP | STRINGIDCMP | BUTTONIDCMP, TAG_DONE);
+                  IDCMP_IDCMPUPDATE | IDCMP_GADGETUP | IDCMP_MENUPICK | INTEGERIDCMP | STRINGIDCMP | BUTTONIDCMP, TAG_DONE);
     UnlockPubScreen(NULL, scr);
     if (!vw) { FreeGadgets(vgl); vgl = NULL; FreeVisualInfo(vvi); return 0; }
+    /* the Track menu on the right mouse button */
+    if ((vmenu = CreateMenus(nm, TAG_DONE))) {
+        if (LayoutMenus(vmenu, vvi, GTMN_NewLookMenus, TRUE, TAG_DONE)) SetMenuStrip(vw, vmenu);
+        else { FreeMenus(vmenu); vmenu = NULL; }
+    }
     hprop = (struct Gadget *)NewObject(NULL, (CONST_STRPTR)"propgclass",
         GA_ID, V_HPROP, GA_Left, vw->BorderLeft, GA_RelBottom, -(vw->BorderBottom - 3), GA_RelWidth, -(vw->BorderLeft + vw->BorderRight + 2),
         GA_Height, vw->BorderBottom - 4, GA_BottomBorder, TRUE, PGA_Freedom, FREEHORIZ, PGA_NewLook, TRUE, PGA_Borderless, TRUE,
@@ -286,10 +349,14 @@ void tv_close(void)
 {
     int k;
     if (!vw) return;
+    if (dmw) { CloseWindow(dmw); dmw = NULL; FreeGadgets(dmgl); dmgl = NULL; FreeVisualInfo(dmvi); dmvi = NULL; }
+    if (vmenu) { ClearMenuStrip(vw); FreeMenus(vmenu); vmenu = NULL; }
     if (hprop) RemoveGadget(vw, hprop);
     if (vprop) RemoveGadget(vw, vprop);
     CloseWindow(vw);
     vw = NULL;
+    if (vmono) CloseFont(vmono);
+    vmono = NULL;
     if (hprop) DisposeObject(hprop);
     if (vprop) DisposeObject(vprop);
     hprop = vprop = NULL;
@@ -377,10 +444,149 @@ static int copy_sel(App *a, int cut)
     return cut;
 }
 
+/* ---- the Demix dialog (as the web / PC version's) ---- */
+
+static const char *demix_label(int ch, int key)
+{
+    App *a = dm_app;
+    const uint8_t *v = a ? a->mx.val[ch & 15] : NULL;
+    if (v && (v[MX_MSB] >= 126 || ch == 9)) return vx_drum(v[MX_MSB] >= 126 ? v[MX_MSB] : 127, v[MX_PROG], key);
+    return NULL;
+}
+
+static const char *const SCOPES[] = {"The selected track", "All tracks", NULL};
+
+static void demix_open(App *a, int by_note)
+{
+    struct Screen *scr;
+    struct NewGadget ng;
+    struct Gadget *g;
+    WORD fh, x0, y;
+    int c, ch;
+    if (dmw) { WindowToFront(dmw); return; }
+    if (!(scr = LockPubScreen(NULL))) return;
+    dm_by_note = by_note;
+    dm_app = a;
+    dmvi = GetVisualInfo(scr, TAG_DONE);
+    fh = scr->Font->ta_YSize;
+    x0 = (WORD)(scr->WBorLeft + 8);
+    y = (WORD)(scr->WBorTop + fh + 1 + 4);
+    memset(&ng, 0, sizeof ng);
+    ng.ng_TextAttr = scr->Font;
+    ng.ng_VisualInfo = dmvi;
+    g = CreateContext(&dmgl);
+    ng.ng_LeftEdge = x0; ng.ng_TopEdge = y; ng.ng_Width = 200; ng.ng_Height = fh + 4; ng.ng_GadgetID = 1;
+    g = dm_scope = CreateGadget(CYCLE_KIND, g, &ng, GTCY_Labels, (ULONG)SCOPES, GTCY_Active, dm_all, TAG_DONE);
+    y += fh + 10;
+    ch = vtrk >= 0 ? ed_channel(&a->ed, (uint32_t)vtrk) : 9;
+    if (ch < 0) ch = 9;
+    if (by_note) {
+        /* the channels whose notes go one track per key */
+        ng.ng_Flags = PLACETEXT_RIGHT; ng.ng_Width = 26; ng.ng_Height = fh + 3;
+        for (c = 0; c < 16; c++) {
+            static char lbl[16][4];
+            sprintf(lbl[c], "%d", c + 1);
+            ng.ng_LeftEdge = (WORD)(x0 + (c % 8) * 52); ng.ng_TopEdge = (WORD)(y + (c / 8) * (fh + 6));
+            ng.ng_GadgetText = (UBYTE *)lbl[c]; ng.ng_GadgetID = 10 + c;
+            g = dm_ch[c] = CreateGadget(CHECKBOX_KIND, g, &ng, GTCB_Checked, c == ch, GTCB_Scaled, TRUE, TAG_DONE);
+        }
+        y += 2 * (fh + 6) + 4;
+    }
+    ng.ng_Flags = PLACETEXT_IN; ng.ng_TopEdge = y; ng.ng_Height = fh + 6; ng.ng_Width = 90;
+    ng.ng_LeftEdge = x0; ng.ng_GadgetText = (UBYTE *)"Demix"; ng.ng_GadgetID = 2;
+    g = CreateGadget(BUTTON_KIND, g, &ng, TAG_DONE);
+    ng.ng_LeftEdge = x0 + 96; ng.ng_GadgetText = (UBYTE *)"Cancel"; ng.ng_GadgetID = 3;
+    g = CreateGadget(BUTTON_KIND, g, &ng, TAG_DONE);
+    y += fh + 12;
+    if (!g) { FreeGadgets(dmgl); dmgl = NULL; FreeVisualInfo(dmvi); UnlockPubScreen(NULL, scr); return; }
+    dmw = OpenWindowTags(NULL, WA_Title, (ULONG)(by_note ? "Demix by Note" : "Demix by Channel"), WA_Left, 120, WA_Top, 60,
+        WA_InnerWidth, by_note ? 430 : 220, WA_InnerHeight, y - scr->WBorTop - fh - 1,
+        WA_Gadgets, (ULONG)dmgl, WA_DragBar, TRUE, WA_DepthGadget, TRUE, WA_CloseGadget, TRUE, WA_Activate, TRUE,
+        WA_PubScreen, (ULONG)scr, WA_IDCMP, IDCMP_CLOSEWINDOW | IDCMP_REFRESHWINDOW | CYCLEIDCMP | CHECKBOXIDCMP | BUTTONIDCMP, TAG_DONE);
+    UnlockPubScreen(NULL, scr);
+    if (!dmw) { FreeGadgets(dmgl); dmgl = NULL; FreeVisualInfo(dmvi); return; }
+    GT_RefreshWindow(dmw, NULL);
+}
+
+static void demix_close(void)
+{
+    if (!dmw) return;
+    CloseWindow(dmw);
+    dmw = NULL;
+    FreeGadgets(dmgl); dmgl = NULL;
+    FreeVisualInfo(dmvi); dmvi = NULL;
+}
+
+/* Demix: the tracks from the last one (the new tracks go right after theirs) */
+static int demix_run(App *a)
+{
+    int t, n = 0, from, to, c;
+    uint16_t chans = 0;
+    char msg[80];
+    if (dm_by_note) {
+        for (c = 0; c < 16; c++)
+            if (dm_ch[c]->Flags & GFLG_SELECTED) chans |= (uint16_t)(1u << c);
+        if (!chans) { info("Tick the channels."); return 0; }
+    }
+    if (dm_all) { from = 0; to = (int)a->ed.ntrk - 1; }
+    else {
+        if (vtrk < 0) { info("Select a track first."); return 0; }
+        from = to = vtrk;
+    }
+    app_ed_begin(a);
+    for (t = to; t >= from; t--)
+        n += dm_by_note ? jb_demix_notes(&a->ed, (uint32_t)t, chans, demix_label) : jb_demix_channels(&a->ed, (uint32_t)t);
+    app_ed_commit(a);
+    snprintf(msg, sizeof msg, n ? "Demix: %d new tracks." : "Demix: nothing to split.", n);
+    info(msg);
+    return n > 0;
+}
+
+static int demix_handle(App *a)
+{
+    struct IntuiMessage *m;
+    int changed = 0, close = 0;
+    while (dmw && (m = GT_GetIMsg(dmw->UserPort))) {
+        ULONG cls = m->Class;
+        UWORD code = m->Code;
+        struct Gadget *src = (struct Gadget *)m->IAddress;
+        GT_ReplyIMsg(m);
+        if (cls == IDCMP_CLOSEWINDOW) { close = 1; break; }
+        if (cls == IDCMP_REFRESHWINDOW) { GT_BeginRefresh(dmw); GT_EndRefresh(dmw, TRUE); continue; }
+        if (cls != IDCMP_GADGETUP) continue;
+        if (src->GadgetID == 1) dm_all = code;
+        else if (src->GadgetID == 2) { changed = demix_run(a); close = 1; }
+        else if (src->GadgetID == 3) close = 1;
+    }
+    if (close) demix_close();
+    return changed;
+}
+
+/* a pick of the Track menu */
+static int menu_pick(App *a, int id)
+{
+    if (vtrk >= 0) edw_select_track(a, vtrk);
+    switch (id) {
+    case M_ROLL: pr_open(a); break;
+    case M_LIST: if (vtrk >= 0) edw_events_open(a, vtrk); else info("Select a track first."); break;
+    case M_STAFF: sw_open(a); break;
+    case M_DRUMS: dw_open(a); break;
+    case M_LYRICS: kw_open(a); break;
+    case M_MIXER: a->want_mixer = 1; break;
+    case M_XGM: xw_open(a); break;
+    case M_DEMIXCH: demix_open(a, 0); break;
+    case M_DEMIXNOTE: demix_open(a, 1); break;
+    case M_TRANSPOSE: jw_open_job(a, 0); break;
+    case M_JOBS: jw_open(a); break;
+    }
+    return 0;
+}
+
 int tv_handle(App *a)
 {
     struct IntuiMessage *m;
     int changed = 0, close = 0;
+    if (dmw) changed |= demix_handle(a);
     while (vw && (m = GT_GetIMsg(vw->UserPort))) {
         ULONG cls = m->Class, gid = 0, top = 0, s = m->Seconds, mi = m->Micros;
         UWORD code = m->Code, qual = m->Qualifier;
@@ -396,6 +602,16 @@ int tv_handle(App *a)
         case IDCMP_CLOSEWINDOW: close = 1; break;
         case IDCMP_REFRESHWINDOW: GT_BeginRefresh(vw); GT_EndRefresh(vw, TRUE); draw(a); break;
         case IDCMP_NEWSIZE: draw(a); break;
+        case IDCMP_MENUPICK: {
+            UWORD c = code;
+            while (c != MENUNULL && vmenu) {
+                struct MenuItem *it = ItemAddress(vmenu, c);
+                if (!it) break;
+                menu_pick(a, (int)(LONG)GTMENUITEM_USERDATA(it));
+                c = it->NextSelect;
+            }
+            break;
+        }
         case IDCMP_IDCMPUPDATE:
             if (gid == V_HPROP) htop = top * bar;
             else if (gid == V_VPROP) ttop = (int)top;
@@ -505,9 +721,9 @@ int tv_handle(App *a)
                 edw_select_track(a, r);
                 if (mx < gx0) {
                     /* M / S in the track column */
-                    WORD col = (WORD)((mx - cx0) / (vw->RPort->TxWidth ? vw->RPort->TxWidth : 8));
-                    if (col == 18) { a->ed.trk[r].mute = (uint8_t)!a->ed.trk[r].mute; app_track_mute(a); }
-                    else if (col == 19) { a->ed.trk[r].solo = (uint8_t)!a->ed.trk[r].solo; app_track_mute(a); }
+                    WORD col = (WORD)((mx - cx0 - 2) / (vmono ? vmono->tf_XSize : 8));
+                    if (col == 20) { a->ed.trk[r].solo = (uint8_t)!a->ed.trk[r].solo; app_track_mute(a); }
+                    else if (col == 22) { a->ed.trk[r].mute = (uint8_t)!a->ed.trk[r].mute; app_track_mute(a); }
                     draw(a);
                     break;
                 }
