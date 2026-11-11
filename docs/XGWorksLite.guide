@@ -182,7 +182,9 @@ blocks along the bars, as in XGworks. A block owns the events from its
 start to the next block's start; a MIDI song's track is one block until
 blocks are made.
 
-The @{b}right mouse button@{ub} is the Track menu (for the selected track):
+The buttons @{b}Roll@{ub}, @{b}List@{ub}, @{b}Demix Ch...@{ub} and @{b}Demix Note...@{ub} work on the
+clicked track. The @{b}right mouse button@{ub} (held, menu in the screen title
+bar) is the Track menu too:
 Piano Roll, Event List, Staff, Drums, Lyrics / Karaoke, Mixer, XGM part
 editor, @{b}Demix by Channel...@{ub}, @{b}Demix by Note...@{ub}, Transpose..., Jobs...
 

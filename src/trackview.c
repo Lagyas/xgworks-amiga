@@ -38,7 +38,7 @@
 
 extern struct Library *GadToolsBase;
 
-enum { V_FROM = 1, V_TO, V_CREATE, V_COUNT, V_REPEAT, V_NAME, V_COPY, V_CUT, V_PASTE, V_DEL, V_OUT, V_IN, V_UNDO, V_HPROP, V_VPROP, V_INFO };
+enum { V_FROM = 1, V_TO, V_CREATE, V_COUNT, V_REPEAT, V_NAME, V_COPY, V_CUT, V_PASTE, V_DEL, V_OUT, V_IN, V_UNDO, V_HPROP, V_VPROP, V_INFO, V_DMCH, V_DMNOTE, V_ROLL, V_LIST };
 
 static struct Window *vw;
 static struct Gadget *vgl, *hprop, *vprop, *g_from, *g_to, *g_count, *g_name, *g_info;
@@ -295,19 +295,21 @@ int tv_open(App *a)
     g = g_name = CreateGadget(STRING_KIND, g, &ng, GTST_MaxChars, 38, TAG_DONE);
     y += fh + 7;
     {
-        static const char *const bt[7] = {"Copy", "Cut", "Paste", "Delete", "-", "+", "Undo"};
-        static const int ids[7] = {V_COPY, V_CUT, V_PASTE, V_DEL, V_OUT, V_IN, V_UNDO};
-        static const WORD bw[7] = {50, 44, 54, 60, 24, 24, 50};
+        static const char *const bt[11] = {"Copy", "Cut", "Paste", "Delete", "-", "+", "Undo", "Roll", "List", "Demix Ch...", "Demix Note..."};
+        static const int ids[11] = {V_COPY, V_CUT, V_PASTE, V_DEL, V_OUT, V_IN, V_UNDO, V_ROLL, V_LIST, V_DMCH, V_DMNOTE};
+        static const WORD bw[11] = {44, 36, 48, 54, 20, 20, 44, 40, 40, 92, 104};
         int k;
         x = (WORD)(scr->WBorLeft + 4);
         ng.ng_Flags = PLACETEXT_IN; ng.ng_TopEdge = y;
-        for (k = 0; k < 7; k++) {
+        for (k = 0; k < 11; k++) {
             ng.ng_LeftEdge = x; ng.ng_Width = bw[k]; ng.ng_GadgetText = (UBYTE *)bt[k]; ng.ng_GadgetID = ids[k];
             g = CreateGadget(BUTTON_KIND, g, &ng, TAG_DONE);
-            x += bw[k] + 4;
+            x += bw[k] + (k == 6 || k == 8 ? 10 : 3);
         }
-        ng.ng_LeftEdge = x + 4; ng.ng_Width = 240; ng.ng_GadgetText = NULL; ng.ng_GadgetID = V_INFO;
-        g = g_info = CreateGadget(TEXT_KIND, g, &ng, GTTX_Text, (ULONG)"Right mouse button: the Track menu (editors, Demix).", GTTX_Border, TRUE, TAG_DONE);
+        /* the messages on a row of their own */
+        y += fh + 7;
+        ng.ng_LeftEdge = (WORD)(scr->WBorLeft + 4); ng.ng_TopEdge = y; ng.ng_Width = 580; ng.ng_GadgetText = NULL; ng.ng_GadgetID = V_INFO;
+        g = g_info = CreateGadget(TEXT_KIND, g, &ng, GTTX_Text, (ULONG)"Click a track, then Demix Ch... / Demix Note... (also the right mouse button menu).", GTTX_Border, TRUE, TAG_DONE);
     }
     tb = (WORD)(y + fh + 7);
     if (!g) { FreeGadgets(vgl); vgl = NULL; FreeVisualInfo(vvi); UnlockPubScreen(NULL, scr); return 0; }
@@ -315,7 +317,7 @@ int tv_open(App *a)
         WA_Width, scr->Width > 700 ? 680 : scr->Width, WA_Height, scr->Height - scr->BarHeight - 1 > 360 ? 360 : scr->Height - scr->BarHeight - 1,
         WA_MinWidth, 600, WA_MinHeight, 140, WA_MaxWidth, ~0, WA_MaxHeight, ~0,
         WA_Gadgets, (ULONG)vgl, WA_DragBar, TRUE, WA_DepthGadget, TRUE, WA_CloseGadget, TRUE, WA_SizeGadget, TRUE,
-        WA_SizeBBottom, TRUE, WA_SizeBRight, TRUE, WA_Activate, TRUE, WA_SimpleRefresh, TRUE, WA_PubScreen, (ULONG)scr,
+        WA_SizeBBottom, TRUE, WA_SizeBRight, TRUE, WA_Activate, TRUE, WA_SimpleRefresh, TRUE, WA_NewLookMenus, TRUE, WA_PubScreen, (ULONG)scr,
         WA_IDCMP, IDCMP_CLOSEWINDOW | IDCMP_NEWSIZE | IDCMP_REFRESHWINDOW | IDCMP_MOUSEBUTTONS | IDCMP_MOUSEMOVE | IDCMP_RAWKEY |
                   IDCMP_IDCMPUPDATE | IDCMP_GADGETUP | IDCMP_MENUPICK | INTEGERIDCMP | STRINGIDCMP | BUTTONIDCMP, TAG_DONE);
     UnlockPubScreen(NULL, scr);
@@ -525,21 +527,27 @@ static int demix_run(App *a)
     char msg[80];
     if (dm_by_note) {
         for (c = 0; c < 16; c++)
-            if (dm_ch[c]->Flags & GFLG_SELECTED) chans |= (uint16_t)(1u << c);
-        if (!chans) { info("Tick the channels."); return 0; }
+        {
+            ULONG on = 0;
+            GT_GetGadgetAttrs(dm_ch[c], dmw, NULL, GTCB_Checked, (ULONG)&on, TAG_DONE);
+            if (on) chans |= (uint16_t)(1u << c);
+        }
+        if (!chans) { info("Demix by Note: tick the channels."); return 0; }
     }
     if (dm_all) { from = 0; to = (int)a->ed.ntrk - 1; }
     else {
         if (vtrk < 0) { info("Select a track first."); return 0; }
         from = to = vtrk;
     }
+    if (!a->ed.ntrk) return 0;
     app_ed_begin(a);
     for (t = to; t >= from; t--)
         n += dm_by_note ? jb_demix_notes(&a->ed, (uint32_t)t, chans, demix_label) : jb_demix_channels(&a->ed, (uint32_t)t);
     app_ed_commit(a);
-    snprintf(msg, sizeof msg, n ? "Demix: %d new tracks." : "Demix: nothing to split.", n);
+    if (!n) app_undo(a);   /* nothing changed: no empty undo step */
+    snprintf(msg, sizeof msg, n ? "Demix: %d new tracks (Undo takes them back)." : "Demix: nothing to split.", n);
     info(msg);
-    return n > 0;
+    return 1;
 }
 
 static int demix_handle(App *a)
@@ -708,6 +716,10 @@ int tv_handle(App *a)
             case V_OUT: if (bpx > 6) bpx -= 6; break;
             case V_IN: if (bpx < 120) bpx += 6; break;
             case V_UNDO: app_undo(a); nsel = 0; changed = 1; break;
+            case V_ROLL: case V_LIST: case V_DMCH: case V_DMNOTE:
+                if (vtrk < 0) { info("Click a track first."); break; }
+                menu_pick(a, src->GadgetID == V_ROLL ? M_ROLL : src->GadgetID == V_LIST ? M_LIST : src->GadgetID == V_DMCH ? M_DEMIXCH : M_DEMIXNOTE);
+                break;
             }
             draw(a);
             break;

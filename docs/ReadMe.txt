@@ -71,7 +71,8 @@ XGWorksLite - the window
   Track View...  opens with every song (as the web main view): Trk, Ch,
              Name, S, M, Sound and the blocks along the bars: select, drag to
              move (with their events), Create, Repeat, Rename, Delete, Copy /
-             Cut / Paste; double click opens the Piano Roll. The right mouse
+             Cut / Paste; double click opens the Piano Roll. Buttons Roll, List,
+             Demix Ch..., Demix Note... for the clicked track; the right mouse
              button is the Track menu: the editors, Demix by Channel... and
              Demix by Note... (the track or all tracks), Transpose..., Jobs.
   Jobs...    XGworks' Job menu: Transpose, Velocity / Gate Time Modify,
