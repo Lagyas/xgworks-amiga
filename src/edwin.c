@@ -149,7 +149,7 @@ int edw_tracks_open(App *a)
     UnlockPubScreen(NULL, scr);
     if (!tw) { FreeGadgets(tgl); tgl = NULL; FreeVisualInfo(tvi); return 0; }
     GT_RefreshWindow(tw, NULL);
-    tsel = a->ed.ntrk > 1 ? 1 : 0;
+    if (tsel < 0 || (uint32_t)tsel >= a->ed.ntrk) tsel = a->ed.ntrk > 1 ? 1 : 0;
     tracks_fill(a);
     return 1;
 }
@@ -372,7 +372,13 @@ void edw_refresh(App *a)
 
 int edw_selected_track(void)
 {
-    return tw ? tsel : -1;
+    return tsel;
+}
+
+void edw_select_track(App *a, int t)
+{
+    tsel = t;
+    if (tw) tracks_fill(a);
 }
 
 void edw_position(App *a, uint32_t pos_us)

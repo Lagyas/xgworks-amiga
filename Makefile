@@ -8,7 +8,7 @@ CFLAGS  = -m68020 -O2 -noixemul -Wall -Wno-pointer-sign -fomit-frame-pointer
 SRC     = src/xgplay.c src/smf.c
 HOSTCC  ?= cc
 
-LITE    = src/main.c src/app.c src/player.c src/mixer.c src/fx.c src/xws.c src/gui_mui.c src/gui_gadtools.c src/mixwin_mui.c src/mixwin_gt.c src/karawin.c src/edwin.c src/pianoroll.c src/rollops.c src/drumwin.c src/drumops.c src/lyrwin.c src/lyrtools.c src/editors.c src/xgmwin.c src/voices.c src/lyredwin.c src/staffwin.c src/jobwin.c src/jobs.c src/edit.c src/edtext.c src/lyrics.c src/textmap.c src/textmap_data.c src/smf.c src/midiout_amiga.c
+LITE    = src/main.c src/app.c src/player.c src/mixer.c src/fx.c src/xws.c src/gui_mui.c src/gui_gadtools.c src/mixwin_mui.c src/mixwin_gt.c src/karawin.c src/edwin.c src/pianoroll.c src/rollops.c src/drumwin.c src/drumops.c src/lyrwin.c src/lyrtools.c src/editors.c src/xgmwin.c src/voices.c src/lyredwin.c src/staffwin.c src/jobwin.c src/jobs.c src/trackview.c src/blocks.c src/xwswrite.c src/edit.c src/edtext.c src/lyrics.c src/textmap.c src/textmap_data.c src/smf.c src/midiout_amiga.c
 
 all: XGPlay XGWorksLite
 
@@ -27,6 +27,7 @@ host: $(SRC) src/smf.h src/mixer.c tools/test_mixer.c
 	$(HOSTCC) -O2 -Wall -Wextra -std=c99 -o build/test_roll tools/test_roll.c src/edit.c src/rollops.c
 	$(HOSTCC) -O2 -Wall -Wextra -std=c99 -o build/test_voices tools/test_voices.c src/voices.c
 	$(HOSTCC) -O2 -Wall -Wextra -std=c99 -o build/jobrun tools/jobrun.c src/edit.c src/jobs.c src/drumops.c src/rollops.c
+	$(HOSTCC) -O2 -Wall -Wextra -std=c99 -o build/test_blocks tools/test_blocks.c src/edit.c src/blocks.c src/xws.c src/xwswrite.c
 	$(HOSTCC) -O2 -Wall -Wextra -std=c99 -o build/test_lyrtools tools/test_lyrtools.c src/edit.c src/drumops.c src/lyrtools.c src/lyrics.c src/rollops.c src/smf.c src/textmap.c src/textmap_data.c
 	$(HOSTCC) -O2 -Wall -Wextra -std=c99 -o build/test_edtext tools/test_edtext.c src/edit.c src/edtext.c src/lyrics.c src/smf.c src/textmap.c src/textmap_data.c
 	$(HOSTCC) -O2 -Wall -Wextra -std=c99 -o build/test_lyrics tools/test_lyrics.c src/smf.c src/lyrics.c src/textmap.c src/textmap_data.c

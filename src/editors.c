@@ -10,10 +10,11 @@
 #include "lyredwin.h"
 #include "staffwin.h"
 #include "jobwin.h"
+#include "trackview.h"
 
 unsigned long eds_signal(void)
 {
-    return edw_signal() | pr_signal() | dw_signal() | lw_signal() | xw_signal() | yw_signal() | sw_signal() | jw_signal();
+    return edw_signal() | pr_signal() | dw_signal() | lw_signal() | xw_signal() | yw_signal() | sw_signal() | jw_signal() | tv_signal();
 }
 
 void eds_refresh(App *a)
@@ -25,6 +26,7 @@ void eds_refresh(App *a)
     xw_refresh(a);
     yw_refresh(a);
     sw_refresh(a);
+    tv_refresh(a);
 }
 
 void eds_position(App *a, uint32_t pos_us, int playing)
@@ -44,6 +46,7 @@ int eds_handle(App *a, unsigned long sigs)
     if (sigs & yw_signal()) ch |= yw_handle(a);
     if (sigs & sw_signal()) sw_handle(a);
     if (sigs & jw_signal()) ch |= jw_handle(a);
+    if (sigs & tv_signal()) ch |= tv_handle(a);
     if (ch) eds_refresh(a);
     return ch;
 }
@@ -58,4 +61,5 @@ void eds_close(void)
     yw_close();
     sw_close();
     jw_close();
+    tv_close();
 }

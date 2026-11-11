@@ -19,11 +19,24 @@ typedef struct {
     uint8_t  sel;      /* selected in an editor (not saved) */
 } EdEv;
 
+/* A block (an XGworks part) of a track: it owns the events from its start to
+ * the next block's start (the first one also those before it). */
+typedef struct {
+    uint32_t start, end;
+    char name[40];
+    uint8_t raw[32];   /* the placement record of an .XWS (unknown bytes kept) */
+    uint8_t has_raw;
+} EdBlock;
+
 typedef struct {
     EdEv *ev;
     uint32_t n, cap;
     uint32_t end;      /* tick of its end (End of Track) */
     uint8_t mute, solo;
+    EdBlock *blk;      /* none: the whole track is one block */
+    uint32_t nblk;
+    uint8_t hdr[32];   /* the .XWS track record header (has_hdr) */
+    uint8_t has_hdr;
 } EdTrack;
 
 typedef struct {

@@ -28,10 +28,11 @@
 #include "lyredwin.h"
 #include "staffwin.h"
 #include "jobwin.h"
+#include "trackview.h"
 
 struct Library *GadToolsBase;
 
-enum { G_LIST, G_PREV, G_PLAY, G_STOP, G_NEXT, G_MIX, G_LYR, G_TRK, G_ROLL, G_DRUMS, G_TEXTS, G_XGM, G_LYRED, G_STAFF, G_JOBS, G_OPEN, G_FOLDER, G_POS, G_TIME, G_TEMPO, G_TRANS, G_RESET, G_OUT, G_INFO, G_COUNT };
+enum { G_LIST, G_PREV, G_PLAY, G_STOP, G_NEXT, G_MIX, G_LYR, G_TRK, G_ROLL, G_DRUMS, G_TEXTS, G_XGM, G_LYRED, G_STAFF, G_JOBS, G_TV, G_NEW, G_CLOSE, G_SAVEAS, G_OPEN, G_FOLDER, G_POS, G_TIME, G_TEMPO, G_TRANS, G_RESET, G_OUT, G_INFO, G_COUNT };
 
 static struct Gadget *gad[G_COUNT];
 static struct Window *win;
@@ -124,15 +125,18 @@ int gui_gadtools(App *a)
     y += lh + 4;
     {
         /* two rows: playing and files; the windows */
-        static const char *const txt[16] = {"|<", "Play", "Stop", ">|", "Open...", "Folder...", "Mixer...", "XGM...", "Lyrics...", "Lyr.Edit...",
-                                            "Texts...", "Tracks...", "Roll...", "Drums...", "Staff...", "Jobs..."};
-        static const WORD bw[16] = {40, 72, 72, 40, 90, 90, 114, 114, 114, 114, 114, 114, 114, 114, 114, 114};
-        static const int ids[16] = {G_PREV, G_PLAY, G_STOP, G_NEXT, G_OPEN, G_FOLDER, G_MIX, G_XGM, G_LYR, G_LYRED, G_TEXTS, G_TRK, G_ROLL, G_DRUMS, G_STAFF, G_JOBS};
+        static const char *const txt[20] = {"|<", "Play", "Stop", ">|", "New", "Close", "Open...", "Folder...",
+                                            "Mixer...", "XGM...", "Lyrics...", "Lyr.Edit...", "Texts...", "Save as...",
+                                            "Track View...", "Tracks...", "Roll...", "Drums...", "Staff...", "Jobs..."};
+        static const WORD bw[20] = {40, 64, 64, 40, 50, 54, 84, 84, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96, 96};
+        static const int ids[20] = {G_PREV, G_PLAY, G_STOP, G_NEXT, G_NEW, G_CLOSE, G_OPEN, G_FOLDER, G_MIX, G_XGM, G_LYR, G_LYRED, G_TEXTS, G_SAVEAS,
+                                    G_TV, G_TRK, G_ROLL, G_DRUMS, G_STAFF, G_JOBS};
         WORD x = x0;
         int k;
-        for (k = 0; k < 16; k++) {
-            if (k == 4) x = x0 + w - 184;
-            if (k == 6 || k == 11) { x = x0; y += bh + 4; }
+        for (k = 0; k < 20; k++) {
+            if (k == 4) x = x0 + 236;
+            if (k == 6) x = x0 + w - 172;
+            if (k == 8 || k == 14) { x = x0; y += bh + 4; }
             ng.ng_LeftEdge = x; ng.ng_TopEdge = y; ng.ng_Width = bw[k]; ng.ng_Height = bh;
             ng.ng_GadgetText = (UBYTE *)txt[k]; ng.ng_GadgetID = ids[k]; ng.ng_Flags = PLACETEXT_IN;
             g = gad[ids[k]] = CreateGadget(BUTTON_KIND, g, &ng, TAG_DONE);
@@ -285,6 +289,28 @@ int gui_gadtools(App *a)
                     break;
                 case G_JOBS:
                     jw_open(a);
+                    show(a);
+                    break;
+                case G_TV:
+                    tv_open(a);
+                    show(a);
+                    break;
+                case G_NEW:
+                case G_CLOSE:
+                case G_SAVEAS:
+                    app_stop(a);
+                    if (src->GadgetID == G_NEW) app_new(a);
+                    else if (src->GadgetID == G_CLOSE) app_close(a);
+                    else app_save_as(a, win);
+                    fill_list(a);
+                    sel = a->cur;
+                    if (a->cur >= 0) set(G_LIST, GTLV_Selected, a->cur);
+                    shown_pos = 0;
+                    set(G_POS, GTSL_Max, a->len_us / 1000000 + 1);
+                    set(G_POS, GTSL_Level, 0);
+                    mixgt_refresh(a);
+                    eds_refresh(a);
+                    kw_update(a, 0, 1);
                     show(a);
                     break;
                 case G_PREV:

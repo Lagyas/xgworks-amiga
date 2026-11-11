@@ -165,7 +165,7 @@ int ed_load(EdSong *s, const uint8_t *buf, size_t n)
 void ed_free(EdSong *s)
 {
     uint32_t i;
-    for (i = 0; i < s->ntrk; i++) free(s->trk[i].ev);
+    for (i = 0; i < s->ntrk; i++) { free(s->trk[i].ev); free(s->trk[i].blk); }
     free(s->trk);
     free(s->pool);
     memset(s, 0, sizeof *s);
@@ -184,7 +184,12 @@ int ed_copy(EdSong *d, const EdSong *s)
     for (i = 0; i < s->ntrk; i++) {
         d->trk[i] = s->trk[i];
         d->trk[i].ev = NULL;
+        d->trk[i].blk = NULL;
         d->trk[i].cap = s->trk[i].n;
+        if (s->trk[i].nblk) {
+            if (!(d->trk[i].blk = (EdBlock *)malloc(s->trk[i].nblk * sizeof(EdBlock)))) { ed_free(d); return 0; }
+            memcpy(d->trk[i].blk, s->trk[i].blk, s->trk[i].nblk * sizeof(EdBlock));
+        }
         if (s->trk[i].n) {
             if (!(d->trk[i].ev = (EdEv *)malloc(s->trk[i].n * sizeof(EdEv)))) { ed_free(d); return 0; }
             memcpy(d->trk[i].ev, s->trk[i].ev, s->trk[i].n * sizeof(EdEv));
@@ -353,6 +358,7 @@ void ed_del_track(EdSong *s, uint32_t t)
 {
     if (t >= s->ntrk) return;
     free(s->trk[t].ev);
+    free(s->trk[t].blk);
     memmove(s->trk + t, s->trk + t + 1, (s->ntrk - t - 1) * sizeof(EdTrack));
     s->ntrk--;
 }

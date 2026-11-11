@@ -17,7 +17,7 @@ jobs:
           wc -l build/host.txt
           (cd build && ./test_mixer test.mid)
           (cd build && ./test_lyrics test.mid)
-          (cd build && ./test_edit test.mid && ./test_edtext test.mid && ./test_roll test.mid && ./test_lyrtools test.mid)
+          (cd build && ./test_edit test.mid && ./test_edtext test.mid && ./test_roll test.mid && ./test_lyrtools test.mid && ./test_blocks test.mid)
       - name: Amiga build (68020, amiga-gcc)
         run: docker run --rm -v "$PWD:/work" -w /work sacredbanana/amiga-compiler:m68k-amigaos make all
       - name: The Amiga program run in vamos (68k emulation of the AmigaOS Shell)

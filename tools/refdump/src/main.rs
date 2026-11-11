@@ -12,6 +12,12 @@ fn main() {
         std::fs::write(&args[3], xgworks_core::export_named(&data)).expect("write");
         return;
     }
+    if args.len() == 4 && args[1] == "--toxws" {
+        let data = std::fs::read(&args[2]).expect("read");
+        let (tracks, ppqn) = xgworks_core::edit_model(&data);
+        std::fs::write(&args[3], xgworks_core::write_xws(&tracks, ppqn)).expect("write");
+        return;
+    }
     if args.len() == 5 && args[1] == "--job" {
         let data = std::fs::read(&args[3]).expect("read");
         let (mut tracks, ppqn) = xgworks_core::edit_model(&data);

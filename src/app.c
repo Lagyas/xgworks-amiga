@@ -261,6 +261,8 @@ void app_free(App *a)
 
 int app_load(App *a, int k)
 {
+    uint8_t *xws_raw = NULL;
+    size_t xws_size = 0;
     char path[512];
     BPTR fh;
     LONG size;
@@ -291,18 +293,22 @@ int app_load(App *a, int k)
     }
     a->is_xws = xws_is(data, (size_t)size);
     if (a->is_xws) {
-        /* an XGworks song: read as the MIDI file XGWorks NextGen would export */
+        /* an XGworks song: read as the MIDI file XGWorks NextGen would export
+           (its blocks and track headers are taken below) */
         size_t mn;
         uint8_t *mid = xws_to_smf(data, (size_t)size, &mn);
-        free(data);
         if (!mid) {
+            free(data);
             snprintf(a->info, sizeof a->info, "%s: not enough memory.", a->names[k]);
             return 0;
         }
+        xws_raw = data;
+        xws_size = (size_t)size;
         data = mid;
         size = (LONG)mn;
     }
     if ((r = xg_smf_load(&a->song, data, (size_t)size)) != XG_OK) {
+        free(xws_raw);
         free(data);
         snprintf(a->info, sizeof a->info, "%s: %s.", a->names[k], xg_error(r));
         return 0;
@@ -310,6 +316,10 @@ int app_load(App *a, int k)
     a->data = data;
     a->cur = k;
     if (!ed_load(&a->ed, data, (size_t)size)) memset(&a->ed, 0, sizeof a->ed);
+    if (xws_raw) {
+        xws_attach_blocks(xws_raw, xws_size, &a->ed);
+        free(xws_raw);
+    }
     mx_from_song(&a->mx, &a->song);
     ly_build(&a->ly, &a->song, a->letters);
     a->len_us = a->song.nev ? xg_tick_us(&a->song, a->song.ev[a->song.nev - 1].tick) : 0;
@@ -444,6 +454,28 @@ void app_track_mute(App *a)
         a->pl.tmute[t] = (uint8_t)(t < a->ed.ntrk && (a->ed.trk[t].mute || (solo && !a->ed.trk[t].solo)));
 }
 
+/* The song (MIDI bytes with the mixer's values) as an .XWS: the blocks and
+   track headers of the edited song go with it. */
+static uint8_t *as_xws(App *a, const uint8_t *smf, size_t n, size_t *out)
+{
+    EdSong t;
+    uint8_t *x;
+    uint32_t k;
+    if (!ed_load(&t, smf, n)) return NULL;
+    for (k = 0; k < t.ntrk && k < a->ed.ntrk; k++) {
+        const EdTrack *src = &a->ed.trk[k];
+        if (src->nblk && (t.trk[k].blk = (EdBlock *)malloc(src->nblk * sizeof(EdBlock)))) {
+            memcpy(t.trk[k].blk, src->blk, src->nblk * sizeof(EdBlock));
+            t.trk[k].nblk = src->nblk;
+        }
+        memcpy(t.trk[k].hdr, src->hdr, 32);
+        t.trk[k].has_hdr = src->has_hdr;
+    }
+    x = xws_write(&t, out);
+    ed_free(&t);
+    return x;
+}
+
 int app_save(App *a)
 {
     char path[512], bak[520];
@@ -465,15 +497,22 @@ int app_save(App *a)
     path[sizeof path - 1] = 0;
     AddPart((STRPTR)path, (CONST_STRPTR)a->names[k], sizeof path);
     if (a->path_as[0]) strcpy(path, a->path_as);
-    else if (a->is_xws) {
-        /* an .XWS is kept as it is: the song goes into <name>.mid next to it */
-        char *dot = strrchr(path, '.');
-        if (dot && strlen(dot) == 4) strcpy(dot, ".mid");
+    {
+        /* an .XWS name: written as an XGworks song, with the blocks and track headers */
+        const char *dot = strrchr(path, '.');
+        if (dot && !ci_cmp(dot, ".xws")) {
+            uint8_t *x = as_xws(a, nb, n, &n);
+            free(nb);
+            if (!(nb = x)) {
+                snprintf(a->info, sizeof a->info, "Not enough memory to save.");
+                return 0;
+            }
+        }
     }
-    /* the first save keeps the original as .bak */
+    /* the first save keeps the file on the disk as .bak */
     snprintf(bak, sizeof bak, "%s.bak", path);
     if ((l = Lock((CONST_STRPTR)bak, ACCESS_READ))) UnLock(l);
-    else if (!a->is_xws && !a->path_as[0] && (l = Lock((CONST_STRPTR)path, ACCESS_READ))) {
+    else if (!a->path_as[0] && (l = Lock((CONST_STRPTR)path, ACCESS_READ))) {
         /* the file as it is on the disk (not the edited song) */
         BPTR fh;
         UnLock(l);
@@ -496,10 +535,10 @@ int app_save(App *a)
     }
     free(nb);
     a->dirty = 0;
-    if (a->is_xws || a->path_as[0]) {
+    if (a->path_as[0]) {
         /* a new file: its folder is listed and the song taken from there */
         char saved[120], folder[256];
-        int was_xws = a->is_xws && !a->path_as[0];
+        int was_xws = 0;
         strncpy(saved, (const char *)FilePart((STRPTR)path), sizeof saved - 1);
         saved[sizeof saved - 1] = 0;
         strncpy(folder, path, sizeof folder - 1);
@@ -509,7 +548,8 @@ int app_save(App *a)
         for (k = 0; k < a->count; k++)
             if (!ci_cmp(a->names[k], saved)) break;
         if (k >= a->count || !app_load(a, k)) return 0;
-        snprintf(a->info, sizeof a->info, was_xws ? "Saved as %s (the .XWS is unchanged)." : "Saved as %s.", saved);
+        (void)was_xws;
+        snprintf(a->info, sizeof a->info, "Saved as %s.", saved);
         return 1;
     }
     {
@@ -539,14 +579,67 @@ int app_save_as(App *a, void *window)
         strncpy(path, (const char *)fr->fr_Drawer, sizeof path - 1);
         path[sizeof path - 1] = 0;
         AddPart((STRPTR)path, (CONST_STRPTR)fr->fr_File, sizeof path);
-        /* an .XWS name gets .mid: the song is written as MIDI */
-        if ((dot = strrchr(path, '.')) && !ci_cmp(dot, ".xws")) strcpy(dot, ".mid");
+        /* no extension: MIDI */
+        if (!(dot = strrchr(path, '.')) || (ci_cmp(dot, ".xws") && ci_cmp(dot, ".mid") && ci_cmp(dot, ".kar"))) strncat(path, ".mid", sizeof path - strlen(path) - 1);
         strcpy(a->path_as, path);
         a->dirty = 1;
         ok = app_save(a);
     }
     FreeAslRequest(fr);
     return ok;
+}
+
+int app_new(App *a)
+{
+    char name[40], path[512];
+    int k;
+    EdSong s;
+    EdEv e;
+    uint8_t *b;
+    size_t n;
+    BPTR l;
+    static const uint8_t tempo[3] = {0x07, 0xA1, 0x20}, sig[4] = {4, 2, 24, 8};
+    /* a name not in the folder yet */
+    for (k = 1; k < 1000; k++) {
+        snprintf(name, sizeof name, "Untitled%d.mid", k);
+        strncpy(path, a->folder, sizeof path - 1);
+        path[sizeof path - 1] = 0;
+        AddPart((STRPTR)path, (CONST_STRPTR)name, sizeof path);
+        if (!(l = Lock((CONST_STRPTR)path, ACCESS_READ))) break;
+        UnLock(l);
+    }
+    /* the conductor (tempo 120, 4/4) and one empty track on channel 1 */
+    memset(&s, 0, sizeof s);
+    s.ppqn = 480;
+    ed_pool_add(&s, (const uint8_t *)"", 0);
+    if (!ed_add_track(&s, 0) || !ed_add_track(&s, 1)) { ed_free(&s); return 0; }
+    memset(&e, 0, sizeof e);
+    e.st = 0xFF; e.d1 = 0x51; e.len = 3; e.data = ed_pool_add(&s, tempo, 3);
+    ed_insert(&s, 0, &e);
+    e.d1 = 0x58; e.len = 4; e.data = ed_pool_add(&s, sig, 4);
+    ed_insert(&s, 0, &e);
+    ed_set_name(&s, 1, (const uint8_t *)"Track 1", 7);
+    s.trk[0].end = s.trk[1].end = (uint32_t)s.ppqn * 4 * 8;
+    b = ed_save(&s, &n);
+    ed_free(&s);
+    if (!b || !write_file(path, b, n)) {
+        free(b);
+        snprintf(a->info, sizeof a->info, "A new song cannot be written into %s.", a->folder);
+        return 0;
+    }
+    free(b);
+    app_scan(a, a->folder);
+    for (k = 0; k < a->count; k++)
+        if (!ci_cmp(a->names[k], name)) break;
+    if (k >= a->count || !app_load(a, k)) return 0;
+    snprintf(a->info, sizeof a->info, "New song %s.", name);
+    return 1;
+}
+
+void app_close(App *a)
+{
+    unload(a);
+    snprintf(a->info, sizeof a->info, "No song loaded.");
 }
 
 void app_set_letters(App *a, int letters)

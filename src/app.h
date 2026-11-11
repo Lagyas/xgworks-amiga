@@ -72,7 +72,10 @@ void app_xp(App *a, int ch, int p, int value);
 void app_fx(App *a, int what, int value);
 /* Write the mixer's values into the song file (song.mid.bak keeps the old one). */
 int  app_save(App *a);
-/* Save as another file (ASL requester); the song belongs to it from then on. */
+/* A new song (tempo 120, 4/4, one track) as UntitledN.mid in the folder; the song closed. */
+int  app_new(App *a);
+void app_close(App *a);
+/* Save as another file (ASL requester; .xws: an XGworks song, else MIDI). */
 int  app_save_as(App *a, void *window);
 /* Editing: app_ed_begin before a change of a->ed (for Undo), app_ed_commit
  * after it (the player, mixer and lyrics take the new song; playing stops). */
