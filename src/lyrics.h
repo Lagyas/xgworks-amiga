@@ -17,6 +17,7 @@ typedef struct {
 
 typedef struct {
     uint32_t first, n; /* syllables */
+    uint32_t page;     /* the karaoke page it is on */
 } LyLine;
 
 typedef struct {
@@ -37,6 +38,8 @@ typedef struct {
 /* letters: TM_ASCII (plain), TM_LATIN2, TM_LATIN1 (textmap.h). 0 = no memory. */
 int  ly_build(Lyrics *ly, const XgSong *s, int letters);
 void ly_free(Lyrics *ly);
+/* The lines of the page shown at `tick` (the page of the last syllable sung): first line and count. */
+void ly_page_at(const Lyrics *ly, uint32_t tick, uint32_t *first, uint32_t *n);
 /* The last syllable / chord at or before `tick` (-1 = none yet). */
 long ly_syl_at(const Lyrics *ly, uint32_t tick);
 long ly_chord_at(const Lyrics *ly, uint32_t tick);

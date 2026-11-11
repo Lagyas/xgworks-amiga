@@ -46,6 +46,17 @@ void lt_line_text(const EdSong *s, uint32_t trk, const uint32_t *idx, const LtLi
  * next line (`next` = its first tick, 0xFFFFFFFF none). Returns the syllables written. */
 int  lt_set_line(EdSong *s, uint32_t trk, const uint32_t *idx, const LtLine *ln, uint32_t next, const char *text, int letters, uint32_t note_trk, int *left);
 
+/* Fill Lyrics (as PSRUTI / XGWorks NextGen): on the beats of the track up to
+ * the song's end the measure string on beat 1, the end string on the last
+ * beat, else the beat string (beat and end empty: beat 1 only), a linefeed
+ * `linefeed` ticks after the last beat (0 = none). method: 0 not at lyrics,
+ * 1 not in beats with lyrics, 2 not in measures with lyrics. A song without
+ * lyrics gets them from measure 2. Returns how many went in. */
+extern const char *const lt_fill_methods[3];
+int  lt_fill_insert(EdSong *s, uint32_t trk, const char *measure, const char *beat, const char *end, uint32_t linefeed, int method, int letters);
+/* Lyrics that are exactly one of the strings, and a linefeed right after one. */
+int  lt_fill_delete(EdSong *s, uint32_t trk, const char *measure, const char *beat, const char *end, int letters);
+
 /* Lyrics and text events without diacritics. Returns how many changed. */
 int  lt_strip_diacritics(EdSong *s);
 

@@ -96,6 +96,7 @@ int app_init(App *a, const char *folder)
 {
     memset(a, 0, sizeof *a);
     a->cur = -1;
+    a->locate_us = -1;
     a->autonext = 1;
     a->kfont = 24;
     strcpy(a->serdev, "serial.device");

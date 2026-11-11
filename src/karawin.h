@@ -1,4 +1,5 @@
-/* The karaoke window of XGWorks Lite (shared by the MUI and GadTools versions). */
+/* The Lyrics / Karaoke window of XGWorks Lite (as XGWorks NextGen's Lyrics
+ * window; shared by the MUI and GadTools versions). */
 #ifndef XG_KARAWIN_H
 #define XG_KARAWIN_H
 
@@ -8,9 +9,10 @@ int  kw_open(App *a);
 void kw_close(void);
 int  kw_is_open(void);
 unsigned long kw_signal(void);
-/* Draw for the song position (only what changed, unless `force`). */
+/* The song position (the preview and the Position line follow it). */
 void kw_update(App *a, uint32_t pos_us, int force);
-/* Its messages; 0 = the window was closed. */
+/* Its messages; 1 = the song changed. A request to move the song position
+ * comes in a->locate_us. */
 int  kw_handle(App *a, uint32_t pos_us);
 
 #endif

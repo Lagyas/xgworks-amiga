@@ -41,6 +41,8 @@ typedef struct {
     int nundo, undo_top;
     int dirty;             /* edited since loaded / saved */
     char path_as[256];     /* Save as: the file the song now belongs to ("" = its own) */
+    uint32_t pos_us;       /* the song position shown */
+    long locate_us;        /* a window asks to move the song position there (-1 = no) */
 } App;
 
 extern const char *const app_reset_names[RESETS + 1];

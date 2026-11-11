@@ -72,6 +72,7 @@ static void show(App *a)
         shown_pos = pos;
         set(G_POS, GTSL_Level, pos / 1000000);
     }
+    a->pos_us = pos;
     kw_update(a, pos, 0);
     eds_position(a, pos, app_playing(a));
     set(G_INFO, GTTX_Text, (ULONG)a->info);
@@ -203,7 +204,23 @@ int gui_gadtools(App *a)
             }
             show(a);
         }
-        if (sigs & kw_signal()) kw_handle(a, app_playing(a) ? a->pl.pos_us : shown_pos);
+        if (sigs & kw_signal()) {
+            if (kw_handle(a, app_playing(a) ? a->pl.pos_us : shown_pos)) {
+                mixgt_refresh(a);
+                eds_refresh(a);
+                if (a->cur >= 0) set(G_POS, GTSL_Max, a->len_us / 1000000 + 1);
+            }
+            show(a);
+        }
+        if (a->locate_us >= 0) {
+            /* a window moved the song position */
+            uint32_t t = (uint32_t)a->locate_us;
+            a->locate_us = -1;
+            if (app_playing(a)) app_play(a, t);
+            shown_pos = t;
+            set(G_POS, GTSL_Level, t / 1000000);
+            show(a);
+        }
         if (sigs & mixgt_signal()) {
             mixgt_handle(a);
             if (a->cur >= 0) set(G_POS, GTSL_Max, a->len_us / 1000000 + 1);

@@ -59,6 +59,7 @@ static void show(App *a)
     sprintf(t, "%s / %s", x, y);
     SetAttrs(ttime, MUIA_Text_Contents, (ULONG)t, TAG_DONE);
     if (app_playing(a)) SetAttrs(spos, MUIA_NoNotify, TRUE, MUIA_Numeric_Value, a->pl.pos_us / 1000000, TAG_DONE);
+    a->pos_us = pos;
     kw_update(a, pos, 0);
     eds_position(a, pos, app_playing(a));
     SetAttrs(tinfo, MUIA_Text_Contents, (ULONG)a->info, TAG_DONE);
@@ -311,7 +312,22 @@ int gui_mui(App *a)
                 show(a);
             }
             if (sigs & SIGBREAKF_CTRL_C) running = 0;
-            if (sigs & kw_signal()) kw_handle(a, app_playing(a) ? a->pl.pos_us : getv(spos, MUIA_Numeric_Value) * 1000000UL);
+            if (sigs & kw_signal()) {
+                if (kw_handle(a, app_playing(a) ? a->pl.pos_us : getv(spos, MUIA_Numeric_Value) * 1000000UL)) {
+                    mixmui_refresh(a);
+                    eds_refresh(a);
+                    if (a->cur >= 0) SetAttrs(spos, MUIA_NoNotify, TRUE, MUIA_Numeric_Max, a->len_us / 1000000 + 1, TAG_DONE);
+                }
+                show(a);
+            }
+            if (a->locate_us >= 0) {
+                /* a window moved the song position */
+                uint32_t t = (uint32_t)a->locate_us;
+                a->locate_us = -1;
+                if (app_playing(a)) app_play(a, t);
+                SetAttrs(spos, MUIA_NoNotify, TRUE, MUIA_Numeric_Value, t / 1000000, TAG_DONE);
+                show(a);
+            }
             if (sigs & pl_signal()) {
                 if (app_poll(a) && a->autonext && a->cur + 1 < a->count) start(a, a->cur + 1, 0);
                 else show(a);

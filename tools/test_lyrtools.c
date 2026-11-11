@@ -105,6 +105,15 @@ static void one(const char *name)
         k = lt_text_to_notes(&s, t, t, -1, from, "Ka-pr se/plá-cá v řece<Nový", TM_LATIN1, &left);
         CHECK(k == 8 || (k > 0 && k + left == 8), "text to notes");
     }
+    /* Fill Lyrics on a track and taken away again: the lyrics as before */
+    {
+        uint32_t ft = lt >= 0 ? (uint32_t)lt : 0;
+        int before = count(&s, 0x05), in, out;
+        in = lt_fill_insert(&s, ft, ".-- ", "--- ", "---", 30, 1, TM_LATIN2);
+        out = lt_fill_delete(&s, ft, ".-- ", "--- ", "---", TM_LATIN2);
+        CHECK(in > 0, "fill lyrics went in");
+        CHECK(out >= in, "fill lyrics taken away"); (void)before;
+    }
     /* drums: toggle a hit on and off */
     if (t < s.ntrk) {
         uint32_t step = s.ppqn / 4, at = ed_tick_of(&s, 5, 1, 0);

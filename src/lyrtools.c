@@ -349,7 +349,7 @@ static int real_syllables(const EdSong *s, uint32_t trk, const uint32_t *idx, co
         uint32_t l = core(s, e, &st), k;
         int text = 0;
         for (k = 0; k < l; k++) text |= s->pool[e->data + st + k] != ' ';
-        if (text) out[n++] = idx[ln->first + j];
+        if (text && n < 400) out[n++] = idx[ln->first + j];   /* the callers have 400 places */
     }
     return n;
 }
@@ -471,4 +471,88 @@ int lt_strip_diacritics(EdSong *s)
             n++;
         }
     return n;
+}
+
+const char *const lt_fill_methods[3] = {"Not at lyrics", "Not in beats with lyrics", "Not in measures with lyrics"};
+
+static void sig_at(const EdSong *s, uint32_t tick, uint32_t *bar, uint32_t *beat)
+{
+    uint32_t tk[64], num[64], bl[64];
+    int n = ed_sigs(s, tk, num, bl, 64), k = n - 1;
+    while (k > 0 && tk[k] > tick) k--;
+    *beat = bl[k] ? bl[k] : 1;
+    *bar = num[k] * *beat;
+    if (!*bar) *bar = 1;
+}
+
+int lt_fill_insert(EdSong *s, uint32_t trk, const char *measure, const char *beat, const char *end, uint32_t linefeed, int method, int letters)
+{
+    uint32_t *had, nh = 0, i, t, song_end = 0, m;
+    int n = 0, only_one = !beat[0] && !end[0];
+    uint8_t enc[3][80];
+    size_t el[3];
+    if (trk >= s->ntrk) return 0;
+    for (t = 0; t < s->ntrk; t++)
+        for (i = 0; i < s->trk[t].n; i++) {
+            const EdEv *e = &s->trk[t].ev[i];
+            uint32_t x = e->tick + ((e->st & 0xF0) == 0x90 && e->d2 ? e->dur : 0);
+            if (x > song_end) song_end = x;
+        }
+    if (!(had = (uint32_t *)malloc((s->trk[trk].n + 1) * sizeof(uint32_t)))) return 0;
+    for (i = 0; i < s->trk[trk].n; i++)
+        if (is_lyric(&s->trk[trk].ev[i])) had[nh++] = s->trk[trk].ev[i].tick;
+    el[0] = tm_to_cp1250_esc(measure, enc[0], 79, letters);
+    el[1] = tm_to_cp1250_esc(beat, enc[1], 79, letters);
+    el[2] = tm_to_cp1250_esc(end, enc[2], 79, letters);
+    for (m = nh ? 1 : 2;; m++) {
+        uint32_t ms = ed_tick_of(s, m, 1, 0), bar, bt, beats, me, k, last = 0xFFFFFFFFUL;
+        int any = 0;
+        if (ms >= song_end) break;
+        sig_at(s, ms, &bar, &bt);
+        beats = bar / bt ? bar / bt : 1;
+        me = ms + bar;
+        for (i = 0; i < nh && !any; i++) any = had[i] >= ms && had[i] < me;
+        if (!(method == 2 && any)) {
+            for (k = 0; k < beats; k++) {
+                uint32_t tt = ms + k * bt, j;
+                int skip = 0, w;
+                for (j = 0; j < nh && !skip; j++) skip = method == 0 ? had[j] == tt : (had[j] >= tt && had[j] < tt + bt);
+                if (skip || (only_one && k > 0)) continue;
+                w = k == 0 ? 0 : k + 1 == beats ? 2 : 1;
+                if (!el[w]) continue;
+                add_meta(s, trk, tt, 0x05, enc[w], (uint32_t)el[w]);
+                last = ms + (beats - 1) * bt;
+                n++;
+            }
+        }
+        if (last != 0xFFFFFFFFUL && linefeed && last + linefeed < me) add_meta(s, trk, last + linefeed, 0x05, (const uint8_t *)"\r", 1);
+    }
+    free(had);
+    return n;
+}
+
+int lt_fill_delete(EdSong *s, uint32_t trk, const char *measure, const char *beat, const char *end, int letters)
+{
+    uint8_t enc[3][80];
+    size_t el[3];
+    uint32_t i, o;
+    int gone = 0, prev_fill = 0, w;
+    EdTrack *t;
+    if (trk >= s->ntrk) return 0;
+    el[0] = tm_to_cp1250_esc(measure, enc[0], 79, letters);
+    el[1] = tm_to_cp1250_esc(beat, enc[1], 79, letters);
+    el[2] = tm_to_cp1250_esc(end, enc[2], 79, letters);
+    t = &s->trk[trk];
+    for (i = o = 0; i < t->n; i++) {
+        const EdEv *e = &t->ev[i];
+        int fill = 0, lf;
+        if (!is_lyric(e)) { t->ev[o++] = t->ev[i]; continue; }
+        for (w = 0; w < 3; w++) fill |= el[w] && e->len == el[w] && !memcmp(s->pool + e->data, enc[w], el[w]);
+        lf = e->len == 1 && s->pool[e->data] == '\r';
+        if (fill || (lf && prev_fill)) { gone++; prev_fill = fill; continue; }
+        prev_fill = fill;
+        t->ev[o++] = t->ev[i];
+    }
+    t->n = o;
+    return gone;
 }

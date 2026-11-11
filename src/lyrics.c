@@ -58,6 +58,8 @@ int ly_build(Lyrics *ly, const XgSong *s, int letters)
     int type = 0x05, trk = -1;
     Str txt = {NULL, 0, 0};
     int brk = 1;            /* the next syllable starts a line */
+    int brk_page = 0;       /* ... a page */
+    uint32_t page = 0;
     memset(ly, 0, sizeof *ly);
     if (!(cnt = (uint32_t *)calloc(s->ntrk + 1, sizeof(uint32_t)))) return 0;
     /* the track with the most lyric events; else the most .kar texts */
@@ -86,7 +88,7 @@ int ly_build(Lyrics *ly, const XgSong *s, int letters)
         const uint8_t *d = s->buf + t->off;
         char conv[512];
         uint32_t len = t->len, a = 0;
-        int new_line, end_line;
+        int new_line, end_line, new_page, end_page;
         if (t->type == 0x7F) {
             LyChord *c = &ly->chord[ly->nchord];
             c->tick = t->tick;
@@ -97,7 +99,9 @@ int ly_build(Lyrics *ly, const XgSong *s, int letters)
         if (t->type != type || (int)t->trk != trk || !len) continue;
         if (type == 0x01 && d[0] == '@') continue;
         /* the marks (as XGWorks NextGen) */
-        new_line = d[0] == '/' || d[0] == '<' || d[0] == '\\';
+        new_page = d[0] == '<' || d[0] == '\\';
+        new_line = d[0] == '/' || new_page;
+        end_page = (len >= 4 && !memcmp(d + len - 4, "\r\n\r\n", 4)) || (len >= 2 && d[len - 1] == '\n' && d[len - 2] == '\n');
         while (a < len && (d[a] == '/' || d[a] == '<' || d[a] == '\\')) a++;
         end_line = len > a && (d[len - 1] == '\r' || d[len - 1] == '\n' || d[len - 1] == '/');
         while (len > a && (d[len - 1] == '\r' || d[len - 1] == '\n' || d[len - 1] == '/')) len--;
@@ -107,12 +111,15 @@ int ly_build(Lyrics *ly, const XgSong *s, int letters)
             for (p = conv; *p; p++)
                 if (*p == '\r' || *p == '\n') *p = ' ';
         }
-        if ((new_line || brk) && (ly->nline == 0 || ly->line[ly->nline - 1].n)) {
+        if ((new_page || brk_page) && ly->nline && ly->line[ly->nline - 1].n) page++;
+        if ((new_line || brk || new_page || brk_page) && (ly->nline == 0 || ly->line[ly->nline - 1].n)) {
             ly->line[ly->nline].first = ly->nsyl;
             ly->line[ly->nline].n = 0;
+            ly->line[ly->nline].page = page;
             ly->nline++;
         }
         brk = end_line;
+        brk_page = end_page;
         ly->syl[ly->nsyl].tick = t->tick;
         ly->syl[ly->nsyl].off = txt.n;
         ly->syl[ly->nsyl].line = (uint16_t)(ly->nline - 1);
@@ -189,4 +196,17 @@ int ly_chord_data(const char *name, uint8_t *d)
     if (t == 34) return 0;
     d[3] = (uint8_t)r; d[4] = (uint8_t)t;
     return 1;
+}
+
+void ly_page_at(const Lyrics *ly, uint32_t tick, uint32_t *first, uint32_t *n)
+{
+    long s = ly_syl_at(ly, tick);
+    uint32_t L = s >= 0 ? ly->syl[s].line : 0, a, b;
+    *first = 0;
+    *n = 0;
+    if (!ly->nline) return;
+    for (a = L; a > 0 && ly->line[a - 1].page == ly->line[L].page; a--) {}
+    for (b = L; b + 1 < ly->nline && ly->line[b + 1].page == ly->line[L].page; b++) {}
+    *first = a;
+    *n = b - a + 1;
 }
