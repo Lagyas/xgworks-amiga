@@ -39,8 +39,8 @@ static void one(const char *name)
         CHECK(xws_attach_blocks(b, (size_t)n, &s) == (int)s.ntrk, "blocks of every track");
     } else ed_load(&s, b, (size_t)n);
     bar = s.ppqn * 4;
-    /* a track with events */
-    for (t = 0; t < s.ntrk && s.trk[t].n < 20; t++) {}
+    /* a track with events from bar 3 on */
+    for (t = 0; t < s.ntrk && count_in(&s.trk[t], 2 * s.ppqn * 4, 0xFFFFFFFFUL) < 5; t++) {}
     if (t == s.ntrk) { ed_free(&s); free(b); return; }
     for (total0 = k = 0; k < s.ntrk; k++) total0 += s.trk[k].n;
     bk_materialize(&s, t, bar);
