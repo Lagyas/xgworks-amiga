@@ -13,6 +13,7 @@
 #include <intuition/icclass.h>
 #include <libraries/gadtools.h>
 #include <graphics/text.h>
+#include <graphics/view.h>
 #include <utility/tagitem.h>
 #include <proto/exec.h>
 #include <proto/intuition.h>
@@ -45,6 +46,12 @@ static struct Gadget *vgl, *hprop, *vprop, *g_from, *g_to, *g_count, *g_name, *g
 static void *vvi;
 static WORD tb, rh, cx0, gx0, gx1, gy0, gy1;
 static UWORD pen_bg = 0, pen_tx = 1, pen_sh = 2, pen_fill = 3;
+/* the colours of the PC / web Track View (XGworks): obtained on open */
+enum { C_HEAD, C_ROW, C_LANE, C_GRID, C_BLOCK, C_BSEL, C_RULER, C_WHITE, C_BLACK, C_SOLO, C_MUTE, C_CYAN, C_N };
+static const ULONG crgb[C_N] = {0x660066, 0x828282, 0x004080, 0x2060A0, 0x6666FF, 0xFF0000, 0xFFCC66, 0xFFFFFF, 0x000000, 0xD6A028, 0xC84038, 0x00DCDC};
+static LONG cpen[C_N];
+static struct ColorMap *ccm;
+static uint32_t cur_tick = 0xFFFFFFFFUL;   /* the play cursor (XOR line), none = ~0 */
 static uint32_t htop;          /* tick at the left */
 static int bpx = 24;           /* pixels per bar */
 static int ttop;               /* first track shown */
@@ -118,9 +125,14 @@ static void layout(void)
     cx0 = vw->BorderLeft;
     gx0 = (WORD)(cx0 + 36 * (vmono ? vmono->tf_XSize : 8) + 6);
     gx1 = (WORD)(vw->Width - vw->BorderRight - 1);
-    gy0 = (WORD)(tb + vw->RPort->TxHeight + 4);
+    gy0 = (WORD)(tb + vw->RPort->TxHeight + 5);
     gy1 = (WORD)(vw->Height - vw->BorderBottom - 1);
 }
+
+static void cursor_xor(App *a);
+
+/* a colour of the PC Track View, else the screen's pen */
+static UWORD CP(int c, UWORD def) { return cpen[c] >= 0 ? (UWORD)cpen[c] : def; }
 
 static void draw(App *a)
 {
@@ -132,26 +144,39 @@ static void draw(App *a)
     rp = vw->RPort;
     layout();
     SetDrMd(rp, JAM1);
-    SetAPen(rp, pen_bg);
-    RectFill(rp, cx0, tb, gx1, gy1);
     endt = tx(a, gx1);
-    /* the column heads (as the web version's Track View) */
+    /* the head row: the column heads on purple, the ruler on blue (as the PC version) */
+    SetAPen(rp, CP(C_HEAD, pen_fill));
+    RectFill(rp, cx0, tb, (WORD)(gx0 - 1), (WORD)(gy0 - 1));
+    SetAPen(rp, CP(C_LANE, pen_bg));
+    RectFill(rp, gx0, tb, gx1, (WORD)(gy0 - 1));
+    /* the track column and the lanes */
+    SetAPen(rp, CP(C_ROW, pen_bg));
+    RectFill(rp, cx0, gy0, (WORD)(gx0 - 1), gy1);
+    SetAPen(rp, CP(C_LANE, pen_bg));
+    RectFill(rp, gx0, gy0, gx1, gy1);
     if (vmono) SetFont(rp, vmono);
-    SetAPen(rp, pen_tx);
-    Move(rp, (WORD)(cx0 + 2), (WORD)(tb + rp->TxBaseline));
+    SetAPen(rp, CP(C_WHITE, pen_sh));
+    Move(rp, (WORD)(cx0 + 2), (WORD)(tb + 2 + rp->TxBaseline));
     Text(rp, (CONST_STRPTR)"Trk Ch Name         S M Sound", 29);
     SetFont(rp, vw->WScreen->RastPort.Font);
-    /* bar numbers */
+    /* bar numbers and the bar lines over all rows */
     for (b0 = htop / bar; b0 * bar <= endt; b0++) {
         WORD x = xt(a, b0 * bar);
         if (x < gx0) continue;
-        SetAPen(rp, pen_tx);
+        SetAPen(rp, CP(C_GRID, pen_sh));
+        Move(rp, x, gy0); Draw(rp, x, gy1);
         if (bpx >= 16 || b0 % 4 == 0) {
             sprintf(txt, "%lu", (unsigned long)b0 + 1);
-            Move(rp, (WORD)(x + 2), (WORD)(tb + rp->TxBaseline));
+            SetAPen(rp, CP(C_RULER, pen_sh));
+            Move(rp, (WORD)(x + 2), (WORD)(tb + 2 + rp->TxBaseline));
             Text(rp, (CONST_STRPTR)txt, strlen(txt));
         }
     }
+    /* the separator under the head */
+    SetAPen(rp, CP(C_BLACK, pen_tx));
+    Move(rp, cx0, (WORD)(gy0 - 1)); Draw(rp, gx1, (WORD)(gy0 - 1));
+    Move(rp, (WORD)(gx0 - 1), tb); Draw(rp, (WORD)(gx0 - 1), gy1);
     for (r = 0; r + ttop < (int)a->ed.ntrk; r++) {
         int ti = r + ttop, nb, k, ch;
         WORD y = (WORD)(gy0 + r * rh);
@@ -160,8 +185,8 @@ static void draw(App *a)
         uint32_t len;
         const uint8_t *n;
         if (y + rh > gy1) break;
-        /* the track column */
-        if (ti == vtrk) { SetAPen(rp, pen_fill); RectFill(rp, cx0, y, (WORD)(gx0 - 2), (WORD)(y + rh - 2)); }
+        /* the track column: the selected track darker */
+        if (ti == vtrk) { SetAPen(rp, CP(C_HEAD, pen_fill)); RectFill(rp, cx0, y, (WORD)(gx0 - 2), (WORD)(y + rh - 2)); }
         n = ed_name(&a->ed, (uint32_t)ti, &len);
         if (n) tm_convert(n, len > 40 ? 40 : len, nm, sizeof nm, a->letters);
         ch = ed_channel(&a->ed, (uint32_t)ti);
@@ -177,15 +202,25 @@ static void draw(App *a)
             snprintf(txt, sizeof txt, "%3d %s %-12.12s %c %c %-12.12s", ti + 1, chs, nm, a->ed.trk[ti].solo ? 'S' : '.', a->ed.trk[ti].mute ? 'M' : '.', snd);
         }
         if (vmono) SetFont(rp, vmono);
-        SetAPen(rp, ti == vtrk ? pen_sh : pen_tx);
-        Move(rp, (WORD)(cx0 + 2), (WORD)(y + 2 + rp->TxBaseline));
-        Text(rp, (CONST_STRPTR)txt, strlen(txt));
+        {
+            WORD cw = vmono ? vmono->tf_XSize : 8, bx = (WORD)(cx0 + 2);
+            /* S / M as coloured boxes when on (as the PC version) */
+            if (a->ed.trk[ti].solo) { SetAPen(rp, CP(C_SOLO, pen_fill)); RectFill(rp, (WORD)(bx + 20 * cw - 1), (WORD)(y + 1), (WORD)(bx + 21 * cw), (WORD)(y + rh - 3)); }
+            if (a->ed.trk[ti].mute) { SetAPen(rp, CP(C_MUTE, pen_fill)); RectFill(rp, (WORD)(bx + 22 * cw - 1), (WORD)(y + 1), (WORD)(bx + 23 * cw), (WORD)(y + rh - 3)); }
+            SetAPen(rp, CP(C_WHITE, ti == vtrk ? pen_sh : pen_tx));
+            Move(rp, bx, (WORD)(y + 2 + rp->TxBaseline));
+            Text(rp, (CONST_STRPTR)txt, strlen(txt));
+            if (a->ed.trk[ti].solo) { SetAPen(rp, CP(C_BLACK, pen_tx)); Move(rp, (WORD)(bx + 20 * cw), (WORD)(y + 2 + rp->TxBaseline)); Text(rp, (CONST_STRPTR)"S", 1); }
+        }
         SetFont(rp, vw->WScreen->RastPort.Font);
-        /* bar lines of the row */
-        SetAPen(rp, pen_sh);
-        for (b0 = htop / bar; b0 * bar <= endt; b0++) {
-            WORD x = xt(a, b0 * bar);
-            if (x >= gx0) { Move(rp, x, y); Draw(rp, x, (WORD)(y + rh - 2)); }
+        /* the row lines */
+        SetAPen(rp, CP(C_GRID, pen_sh));
+        Move(rp, gx0, (WORD)(y + rh - 1)); Draw(rp, gx1, (WORD)(y + rh - 1));
+        SetAPen(rp, CP(C_BLACK, pen_tx));
+        Move(rp, cx0, (WORD)(y + rh - 1)); Draw(rp, (WORD)(gx0 - 2), (WORD)(y + rh - 1));
+        if (ti == vtrk) {
+            SetAPen(rp, CP(C_CYAN, pen_sh));
+            Move(rp, cx0, y); Draw(rp, (WORD)(gx0 - 2), y); Draw(rp, (WORD)(gx0 - 2), (WORD)(y + rh - 2)); Draw(rp, cx0, (WORD)(y + rh - 2)); Draw(rp, cx0, y);
         }
         /* the blocks */
         nb = bk_view(&a->ed, (uint32_t)ti, bar, blks, 256);
@@ -195,16 +230,16 @@ static void draw(App *a)
             if (x1 < gx0 || x0 > gx1) continue;
             if (x0 < gx0) x0 = gx0;
             if (x1 > gx1) x1 = gx1;
-            SetAPen(rp, s ? pen_tx : pen_fill);
+            SetAPen(rp, s ? CP(C_BSEL, pen_tx) : CP(C_BLOCK, pen_fill));
             RectFill(rp, x0, (WORD)(y + 1), x1, (WORD)(y + rh - 3));
-            SetAPen(rp, pen_tx);
+            SetAPen(rp, CP(C_BLACK, pen_tx));
             Move(rp, x0, (WORD)(y + 1)); Draw(rp, x1, (WORD)(y + 1)); Draw(rp, x1, (WORD)(y + rh - 3)); Draw(rp, x0, (WORD)(y + rh - 3)); Draw(rp, x0, (WORD)(y + 1));
             if (blks[k].name[0] && x1 - x0 > 16) {
                 char bn[44];
                 int maxc = (x1 - x0 - 4) / (rp->TxWidth ? rp->TxWidth : 8);
                 tm_convert((const uint8_t *)blks[k].name, strlen(blks[k].name), bn, sizeof bn, a->letters);
                 if ((int)strlen(bn) > maxc) bn[maxc > 0 ? maxc : 0] = 0;
-                SetAPen(rp, s ? pen_sh : pen_sh);
+                SetAPen(rp, CP(C_WHITE, pen_sh));
                 Move(rp, (WORD)(x0 + 2), (WORD)(y + 2 + rp->TxBaseline));
                 Text(rp, (CONST_STRPTR)bn, strlen(bn));
             }
@@ -221,6 +256,40 @@ static void draw(App *a)
         SetGadgetAttrs(hprop, vw, NULL, PGA_Total, t, PGA_Visible, (gx1 - gx0) / bpx, PGA_Top, htop / bar, TAG_DONE);
         SetGadgetAttrs(vprop, vw, NULL, PGA_Total, a->ed.ntrk ? a->ed.ntrk : 1, PGA_Visible, (gy1 - gy0) / rh, PGA_Top, ttop, TAG_DONE);
     }
+    cursor_xor(a);
+}
+
+/* the play cursor: an XOR line over the lanes (drawn twice it is gone) */
+static void cursor_xor(App *a)
+{
+    struct RastPort *rp;
+    WORD x;
+    if (!vw || cur_tick == 0xFFFFFFFFUL) return;
+    x = xt(a, cur_tick);
+    if (x < gx0 || x > gx1) return;
+    rp = vw->RPort;
+    SetDrMd(rp, COMPLEMENT);
+    Move(rp, x, tb); Draw(rp, x, gy1);
+    SetDrMd(rp, JAM1);
+}
+
+void tv_position(App *a, uint32_t pos_us, int playing)
+{
+    uint32_t t, bar;
+    if (!vw || a->cur < 0 || drag) return;
+    t = xg_us_tick(&a->song, pos_us);
+    if (t == cur_tick) return;
+    cursor_xor(a);
+    cur_tick = t;
+    bar = bar_ticks(a);
+    if (playing && (xt(a, t) > gx1 || t < htop)) {
+        /* the next page */
+        htop = t / bar * bar;
+        cur_tick = 0xFFFFFFFFUL;
+        draw(a);
+        cur_tick = t;
+    }
+    cursor_xor(a);
 }
 
 static void drag_xor(App *a)
@@ -261,6 +330,16 @@ int tv_open(App *a)
         pen_bg = dri->dri_Pens[BACKGROUNDPEN]; pen_tx = dri->dri_Pens[SHADOWPEN];
         pen_sh = dri->dri_Pens[SHINEPEN]; pen_fill = dri->dri_Pens[FILLPEN];
         FreeScreenDrawInfo(scr, dri);
+    }
+    {
+        int c;
+        /* the PC colours: on a screen with few colours the nearest ones (or the screen's pens) */
+        ccm = scr->ViewPort.ColorMap;
+        for (c = 0; c < C_N; c++) {
+            ULONG r = (crgb[c] >> 16) & 255, gg = (crgb[c] >> 8) & 255, b = crgb[c] & 255;
+            cpen[c] = (ccm && scr->RastPort.BitMap->Depth >= 4)
+                ? ObtainBestPen(ccm, r * 0x01010101UL, gg * 0x01010101UL, b * 0x01010101UL, OBP_Precision, PRECISION_GUI, TAG_DONE) : -1;
+        }
     }
     vvi = GetVisualInfo(scr, TAG_DONE);
     fh = scr->Font->ta_YSize;
@@ -359,6 +438,15 @@ void tv_close(void)
     vw = NULL;
     if (vmono) CloseFont(vmono);
     vmono = NULL;
+    {
+        int c;
+        for (c = 0; c < C_N; c++) {
+            if (cpen[c] >= 0 && ccm) ReleasePen(ccm, (ULONG)cpen[c]);
+            cpen[c] = -1;
+        }
+        ccm = NULL;
+    }
+    cur_tick = 0xFFFFFFFFUL;
     if (hprop) DisposeObject(hprop);
     if (vprop) DisposeObject(vprop);
     hprop = vprop = NULL;
@@ -756,6 +844,7 @@ int tv_handle(App *a)
                     if (nsel < 64) { sel[nsel].trk = r; sel[nsel].bi = hit; nsel++; }
                 }
                 GT_SetGadgetAttrs(g_name, vw, NULL, GTST_String, (ULONG)blks[hit].name, TAG_DONE);
+                cur_tick = 0xFFFFFFFFUL;
                 draw(a);
                 drag = 1; drag_trk = r; drag_bi = hit;
                 dx0 = dx1 = mx;

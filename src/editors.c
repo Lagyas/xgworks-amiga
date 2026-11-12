@@ -32,6 +32,7 @@ void eds_refresh(App *a)
 void eds_position(App *a, uint32_t pos_us, int playing)
 {
     pr_position(a, pos_us, playing);
+    tv_position(a, pos_us, playing);
     sw_position(a, pos_us, playing);
 }
 
