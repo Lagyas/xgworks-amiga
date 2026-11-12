@@ -26,5 +26,17 @@ int main(int argc, char **argv)
     vx_set_gs(1);
     for (p = 0; p < 128; p++) printf("g %d %s / %s / %s\n", p, vx_sound(0, 0, 0, p), vx_sound(0, 8, 0, p), vx_sound(9, 0, 0, p));
     vx_free();
+    {
+        /* the formats the windows use (the C library of the Amiga) */
+        char b[96];
+        sprintf(b, "%3d %-13.13s|", 36, "Kick Tight");
+        printf("f1 %s\n", b);
+        snprintf(b, sizeof b, "%3d %s %-12.12s %c %c %-12.12s|", 1, " 2", "A long track name", 'S', '.', "Grand Piano");
+        printf("f2 %s\n", b);
+        sprintf(b, "%3d %-18.18s|", 38, "Snare");
+        printf("f3 %s\n", b);
+        sprintf(b, "%-13s|%.5s|%13s|", "ab", "abcdefgh", "cd");
+        printf("f4 %s\n", b);
+    }
     return 0;
 }

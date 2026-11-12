@@ -29,6 +29,7 @@ jobs:
           build/vxdump build/xg4 > build/vx-host.txt
           vamos --cpu 68020 VxDump build/xg4 > build/vx-amiga.txt
           head -3 build/vx-host.txt; grep -c . build/vx-host.txt
+          grep "^f" build/vx-host.txt; grep "^f" build/vx-amiga.txt || true
           diff build/vx-host.txt build/vx-amiga.txt && echo "Voice lists on 68020 = PC build: OK"
       - name: Package
         run: |
