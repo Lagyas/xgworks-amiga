@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "voices.h"
+#include "drumops.h"
 
 static VxVoice *vv;
 static int nv, capv;
@@ -12,6 +13,9 @@ static uint32_t nnames, capnames;
 typedef struct { uint8_t msb, prog, key; uint32_t name; } VxDrum;
 static VxDrum *dr;
 static int nd, capd;
+/* inst.ini: the Drum window's row order and the drum kinds */
+static uint8_t dorder[128], dkind[128];
+static int ndorder;
 
 static uint32_t add_name(const char *s, size_t n)
 {
@@ -136,9 +140,88 @@ static int voice_cmp(const void *a, const void *b)
     return x->lsb - y->lsb;
 }
 
+/* inst.ini [User]: "row=NNname" (NN the key) and "InstColor<row>=kind" */
+static void load_inst(const char *dir)
+{
+    long n;
+    char *b = read_file(dir, "inst.ini", &n), *p;
+    int in_user = 0, k;
+    uint8_t seen[128];
+    ndorder = 0;
+    memset(seen, 0, sizeof seen);
+    for (k = 0; k < 128; k++) {
+        /* without inst.ini: the kinds of the GM keys (as the PC version) */
+        dkind[k] = (uint8_t)(k == 35 || k == 36 ? 2 : k == 42 || k == 44 || k == 46 ? 3
+            : k == 49 || k == 51 || k == 52 || k == 53 || k == 55 || k == 57 || k == 59 ? 4
+            : k == 41 || k == 43 || k == 45 || k == 47 || k == 48 || k == 50 ? 5
+            : k == 37 || k == 38 || k == 40 ? 0 : 1);
+    }
+    if (b) {
+        uint8_t rowkey[128];
+        int nrow = 0;
+        for (p = b; *p;) {
+            char *e = p;
+            size_t len;
+            while (*e && *e != '\n') e++;
+            len = (size_t)(e - p);
+            while (len && (p[len - 1] == '\r' || p[len - 1] == ' ')) len--;
+            if (len && *p == '[') in_user = len == 6 && !strncmp(p, "[User]", 6);
+            else if (in_user && len) {
+                char *eq = memchr(p, '=', len);
+                if (eq && !strncmp(p, "InstColor", 9)) {
+                    int row = atoi(p + 9);
+                    if (row >= 0 && row < nrow) dkind[rowkey[row]] = (uint8_t)atoi(eq + 1);
+                } else if (eq && *p >= '0' && *p <= '9' && eq[1] >= '0' && eq[1] <= '9') {
+                    int key = atoi(eq + 1);
+                    if (key >= 0 && key < 128 && !seen[key] && nrow < 128) {
+                        seen[key] = 1;
+                        rowkey[nrow++] = (uint8_t)key;
+                        dorder[ndorder++] = (uint8_t)key;
+                    }
+                }
+            }
+            p = *e ? e + 1 : e;
+        }
+        free(b);
+    }
+    if (!ndorder)
+        for (k = 127; k >= 0; k--) { dorder[ndorder++] = (uint8_t)k; seen[k] = 1; }
+    for (k = 0; k < 128; k++)
+        if (!seen[k]) dorder[ndorder++] = (uint8_t)k;
+}
+
+void vx_drum_order(uint8_t order[128])
+{
+    if (!ndorder) load_inst("");
+    memcpy(order, dorder, 128);
+}
+
+int vx_drum_kind(int key)
+{
+    if (!ndorder) load_inst("");
+    return dkind[key & 127];
+}
+
+const char *vx_drum_of(int ch, int msb, int prog, int key)
+{
+    const char *n;
+    /* channel 10 without a drum bank: the drum bank (XG) */
+    if (msb < 126) { msb = 127; if ((ch & 15) != 9) prog = 0; }
+    n = vx_drum(msb, prog, key);
+    if (!n && msb == 126) n = vx_drum(127, 0, key);
+    if (n) {
+        const char *q = n;
+        while (*q == ' ') q++;
+        if (!*q || *q == '*') n = NULL;
+    }
+    if (!n) n = dr_gm_names[key & 127];
+    return n;
+}
+
 int vx_load(const char *dir)
 {
     vx_free();
+    load_inst(dir);
     load_list(dir, "Melody.ini", "Melody", 0, 0);
     load_list(dir, "SFX.ini", "SFX", 64, 0);
     load_list(dir, "SFX Kit.ini", "SFX Kit", 126, 1);

@@ -31,7 +31,7 @@ jobs:
           cp XGPlay XGWorksLite "out/XGWorks Lite/"
           mkdir -p "out/XGWorks Lite/Songs"
           mkdir -p "out/XGWorks Lite/XG4"
-          printf 'Copy Melody.ini, SFX.ini, SFX Kit.ini and Drum Kit.ini of your\nXGworks V4.0 here: the sound and drum names then come from them.\n' > "out/XGWorks Lite/XG4/ReadMe"
+          printf 'Copy Melody.ini, SFX.ini, SFX Kit.ini, Drum Kit.ini and inst.ini of\nyour XGworks V4.0 here: the sound and drum names then come from them.\n' > "out/XGWorks Lite/XG4/ReadMe"
           cp docs/ReadMe.txt "out/XGWorks Lite/ReadMe"
           cp docs/XGWorksLite.guide "out/XGWorks Lite/"
           cd out && zip -r ../XGWorksLite-amiga.zip "XGWorks Lite"

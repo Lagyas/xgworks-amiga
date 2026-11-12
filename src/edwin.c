@@ -19,6 +19,8 @@
 #include "edtext.h"
 #include "textmap.h"
 #include "screen.h"
+#include "voices.h"
+#include "mixer.h"
 
 extern struct Library *GadToolsBase;
 
@@ -211,8 +213,41 @@ static long row_of(App *a, long i)
     return (long)n - 1;
 }
 
+/* the bank / program of each channel up to an event (for the sound names) */
+typedef struct { uint8_t msb[16], lsb[16], prog[16]; } BankSt;
+
+static void bank_feed(BankSt *b, const EdEv *e)
+{
+    int ch = e->st & 15;
+    if ((e->st & 0xF0) == 0xB0 && e->d1 == 0) b->msb[ch] = e->d2;
+    else if ((e->st & 0xF0) == 0xB0 && e->d1 == 32) b->lsb[ch] = e->d2;
+    else if ((e->st & 0xF0) == 0xC0) b->prog[ch] = e->d1;
+}
+
+/* the sound of a program change, the drum of a drum note (as the PC / web List) */
+static void name_suffix(const BankSt *b, const EdEv *e, char *line, size_t max)
+{
+    int ch = e->st & 15, k = e->st & 0xF0;
+    const char *n = NULL;
+    size_t l;
+    if (e->st >= 0xF0) return;
+    if (k == 0xC0) {
+        n = vx_name(b->msb[ch], b->lsb[ch], e->d1);
+        if (!n && b->msb[ch] >= 126) n = vx_name(b->msb[ch], 0, e->d1);
+        if (!n) n = ch == 9 || b->msb[ch] >= 126 ? "Drums" : mx_gm_names[e->d1 & 127];
+    } else if ((k == 0x90 || k == 0x80 || k == 0xA0) && (ch == 9 || b->msb[ch] >= 126)) {
+        n = vx_drum_of(ch, b->msb[ch], b->prog[ch], e->d1);
+    }
+    if (!n) return;
+    l = strlen(line);
+    while (l < 32 && l + 1 < max) line[l++] = ' ';
+    snprintf(line + l, max - l, "  %s", n);
+}
+
 static void ev_draw(App *a)
 {
+    BankSt bank;
+    uint32_t fed = 0;
     struct RastPort *rp;
     long i;
     uint32_t n = enum_ev(a);
@@ -227,13 +262,20 @@ static void ev_draw(App *a)
     }
     if (mono) SetFont(rp, mono);
     SetDrMd(rp, JAM2);
+    memset(&bank, 0, sizeof bank);
     for (i = 0; i < erows; i++) {
         long k = etop + i;
         char line[220];
         WORD y = (WORD)(ey0 + i * rp->TxHeight);
         int len;
         line[0] = 0;
-        if (k < (long)n) et_format(&a->ed, &a->ed.trk[etrk].ev[emap[k]], line, sizeof line, a->letters);
+        if (k < (long)n) {
+            const EdEv *e = &a->ed.trk[etrk].ev[emap[k]];
+            /* the banks / programs before it (from the track's start) */
+            while (fed < emap[k]) bank_feed(&bank, &a->ed.trk[etrk].ev[fed++]);
+            et_format(&a->ed, e, line, sizeof line, a->letters);
+            name_suffix(&bank, e, line, sizeof line);
+        }
         len = (int)strlen(line);
         {
             int cols = ewid / (rp->TxWidth ? rp->TxWidth : 8);

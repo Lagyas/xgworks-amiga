@@ -83,8 +83,10 @@ XGWorksLite - the window
              Delete Measure, Transpose Chord, Modify Control Data, Stretch
              Time, Demix by Channel / by Note.
 
-  Sound names: copy Melody.ini, SFX.ini, SFX Kit.ini and Drum Kit.ini of
-  your XGworks V4.0 into the XG4 folder next to XGWorksLite (else GM names).
+  Sound names: copy Melody.ini, SFX.ini, SFX Kit.ini, Drum Kit.ini and
+  inst.ini of your XGworks V4.0 into the XG4 folder next to XGWorksLite
+  (else GM names). The Event List shows the sounds of program changes and
+  the drums of drum notes; the Drum editor names its rows after the kit.
 
   With MUI installed the window is an MUI window; otherwise (or with CLASSIC)
   the classic GadTools window, which needs nothing extra. Keys in the classic

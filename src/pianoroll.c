@@ -26,6 +26,7 @@
 #include "rollops.h"
 #include "edwin.h"
 #include "screen.h"
+#include "pal.h"
 
 extern struct Library *GadToolsBase;
 
@@ -127,35 +128,36 @@ static void draw(App *a)
     layout();
     nsig = ed_sigs(&a->ed, sig_tk, sig_num, sig_bl, 64);
     SetDrMd(rp, JAM1);
-    /* rows */
+    /* rows: white, the black keys' rows grey, thin row lines (as the PC version) */
     for (k = vtop; yk(k) <= ay1 && k >= 0; k--) {
         WORD y = yk(k), y2 = (WORD)(y + kh - 1);
         if (y2 > ay1) y2 = ay1;
-        fill(is_black(k) ? pen_bg : pen_sh, ax0, y, ax1, y2);
-        /* the keyboard */
-        SetAPen(rp, is_black(k) ? pen_tx : pen_sh);
+        fill(is_black(k) ? pal(PAL_KEYROW, pen_bg) : pal(PAL_WHITE, pen_sh), ax0, y, ax1, y2);
+        if (pal_ok() && kh >= 5) { SetAPen(rp, pal(PAL_LINE, pen_bg)); Move(rp, ax0, y2); Draw(rp, ax1, y2); }
+        /* the keyboard: white keys, black keys over half of them */
+        SetAPen(rp, pal(PAL_WHITE, pen_sh));
         RectFill(rp, kx0, y, ax0 - 2, y2);
-        if (k % 12 == 0) {
-            SetAPen(rp, pen_tx);
+        if (is_black(k)) { SetAPen(rp, pal(PAL_BLACK, pen_tx)); RectFill(rp, kx0, y, (WORD)(kx0 + (ax0 - kx0) / 2), y2); }
+        if (k % 12 == 0 || k % 12 == 5) {
+            SetAPen(rp, pal(PAL_BLACK, pen_tx));
             Move(rp, kx0, y2);
             Draw(rp, ax0 - 2, y2);
-            if (kh >= rp->TxHeight - 1) {
-                sprintf(txt, "C%d", k / 12 - 2);
-                SetAPen(rp, pen_tx);
-                SetBPen(rp, pen_sh);
-                SetDrMd(rp, JAM2);
-                Move(rp, kx0 + 2, (WORD)(y2 - rp->TxHeight + 1 + rp->TxBaseline));
-                Text(rp, (CONST_STRPTR)txt, strlen(txt));
-                SetDrMd(rp, JAM1);
-            }
+        }
+        if (k % 12 == 0 && kh >= rp->TxHeight - 1) {
+            sprintf(txt, "C%d", k / 12 - 2);
+            SetAPen(rp, pal(PAL_BLACK, pen_tx));
+            Move(rp, (WORD)(ax0 - 2 - TextLength(rp, (CONST_STRPTR)txt, strlen(txt)) - 1), (WORD)(y2 - rp->TxHeight + 1 + rp->TxBaseline));
+            Text(rp, (CONST_STRPTR)txt, strlen(txt));
         }
     }
-    if (yk(k) <= ay1) fill(pen_bg, ax0, yk(k), ax1, ay1);
+    if (yk(k) <= ay1) fill(pal(PAL_LIGHT, pen_bg), ax0, yk(k), ax1, ay1);
+    SetAPen(rp, pal(PAL_BLACK, pen_tx));
+    Move(rp, (WORD)(ax0 - 1), ay0); Draw(rp, (WORD)(ax0 - 1), ay1);
     /* ruler and the velocity lane */
-    fill(pen_bg, ax0, ry0, ax1, ay0 - 1);
-    fill(pen_bg, kx0, ry0, ax0 - 1, ay0 - 1);
-    fill(pen_bg, kx0, ay1 + 1, ax1, vy1);
-    fill(pen_sh, ax0, vy0, ax1, vy1);
+    fill(pal(PAL_LIGHT, pen_bg), ax0, ry0, ax1, ay0 - 1);
+    fill(pal(PAL_LIGHT, pen_bg), kx0, ry0, ax0 - 1, ay0 - 1);
+    fill(pal(PAL_LIGHT, pen_bg), kx0, ay1 + 1, ax1, vy1);
+    fill(pal(PAL_WHITE, pen_sh), ax0, vy0, ax1, vy1);
     /* beat and bar lines */
     end_tick = (uint32_t)tx(ax1);
     for (s = 0; s < nsig; s++) {
@@ -170,14 +172,14 @@ static void draw(App *a)
             if (beat < htop) continue;
             x = xt(beat);
             if (bar_line || (long)bl / (long)tpp >= 4) {
-                SetAPen(rp, bar_line ? pen_tx : pen_bg);
+                SetAPen(rp, bar_line ? pal(PAL_BARLINE, pen_tx) : pal(PAL_BEAT, pen_bg));
                 Move(rp, x, ay0);
                 Draw(rp, x, ay1);
             }
             if (bar_line) {
                 sprintf(txt, "%lu", (unsigned long)(bar0 + bars / sig_num[s]));
                 if (x + (WORD)TextLength(rp, (CONST_STRPTR)txt, strlen(txt)) < ax1) {
-                    SetAPen(rp, pen_tx);
+                    SetAPen(rp, pal(PAL_BLACK, pen_tx));
                     Move(rp, (WORD)(x + 2), (WORD)(ry0 + rp->TxBaseline));
                     Text(rp, (CONST_STRPTR)txt, strlen(txt));
                     Move(rp, x, (WORD)(ay0 - 3));
@@ -201,7 +203,7 @@ static void draw(App *a)
             /* the velocity */
             if (x0 <= ax1) {
                 WORD h = (WORD)(e->d2 * (vy1 - vy0) / 127);
-                SetAPen(rp, e->sel ? pen_tx : pen_fill);
+                SetAPen(rp, e->sel ? pal(PAL_RED, pen_tx) : pal(PAL_NOTE, pen_fill));
                 RectFill(rp, x0, (WORD)(vy1 - h), (WORD)(x0 + 1 > ax1 ? ax1 : x0 + 1), vy1);
             }
             if (e->d1 > vtop || yk(e->d1) > ay1) continue;
@@ -209,10 +211,10 @@ static void draw(App *a)
             y1 = (WORD)(yk(e->d1) + kh - 1);
             if (y1 > ay1) y1 = ay1;
             if (y1 < y0) y1 = y0;
-            SetAPen(rp, e->sel ? pen_tx : pen_fill);
+            SetAPen(rp, e->sel ? pal(PAL_RED, pen_tx) : pal(PAL_NOTE, pen_fill));
             RectFill(rp, x0, y0, x1, y1);
-            if (x1 - x0 > 3 && !e->sel) {
-                SetAPen(rp, pen_tx);
+            if (x1 - x0 > 3 && (!e->sel || pal_ok())) {
+                SetAPen(rp, pal(PAL_BLACK, pen_tx));
                 Move(rp, x0, y1); Draw(rp, x0, y0); Draw(rp, x1, y0); Draw(rp, x1, y1); Draw(rp, x0, y1);
             }
         }
@@ -282,6 +284,7 @@ int pr_open(App *a)
         pen_sh = dri->dri_Pens[SHINEPEN]; pen_fill = dri->dri_Pens[FILLPEN];
         FreeScreenDrawInfo(scr, dri);
     }
+    pal_open(scr);
     rvi = GetVisualInfo(scr, TAG_DONE);
     fh = scr->Font->ta_YSize;
     tb = (WORD)(scr->WBorTop + fh + 1 + 2);
@@ -316,7 +319,7 @@ int pr_open(App *a)
         g = CreateGadget(BUTTON_KIND, g, &ng, TAG_DONE);
     }
     tb = (WORD)(tb + fh + 7);
-    if (!g) { FreeGadgets(rgl); rgl = NULL; FreeVisualInfo(rvi); UnlockPubScreen(NULL, scr); return 0; }
+    if (!g) { FreeGadgets(rgl); rgl = NULL; FreeVisualInfo(rvi); UnlockPubScreen(NULL, scr); pal_close(); return 0; }
     rw = OpenWindowTags(NULL, WA_Title, (ULONG)"Piano Roll", WA_Left, 0, WA_Top, scr->BarHeight + 1,
         WA_Width, scr->Width > 700 ? 680 : scr->Width, WA_Height, scr->Height - scr->BarHeight - 1 > 400 ? 400 : scr->Height - scr->BarHeight - 1,
         WA_MinWidth, 560, WA_MinHeight, 140, WA_MaxWidth, ~0, WA_MaxHeight, ~0,
@@ -326,7 +329,7 @@ int pr_open(App *a)
                   IDCMP_VANILLAKEY | IDCMP_IDCMPUPDATE | IDCMP_GADGETUP | CYCLEIDCMP | INTEGERIDCMP | BUTTONIDCMP,
         TAG_DONE);
     UnlockPubScreen(NULL, scr);
-    if (!rw) { FreeGadgets(rgl); rgl = NULL; FreeVisualInfo(rvi); return 0; }
+    if (!rw) { FreeGadgets(rgl); rgl = NULL; FreeVisualInfo(rvi); pal_close(); return 0; }
     /* the scrollers in the borders */
     hprop = (struct Gadget *)NewObject(NULL, (CONST_STRPTR)"propgclass",
         GA_ID, R_HPROP, GA_Left, rw->BorderLeft, GA_RelBottom, -(rw->BorderBottom - 3), GA_RelWidth, -(rw->BorderLeft + rw->BorderRight + 2),
@@ -360,6 +363,7 @@ void pr_close(void)
     hprop = vprop = NULL;
     FreeGadgets(rgl); rgl = NULL;
     FreeVisualInfo(rvi); rvi = NULL;
+    pal_close();
 }
 
 void pr_refresh(App *a)

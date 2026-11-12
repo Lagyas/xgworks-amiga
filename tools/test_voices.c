@@ -25,6 +25,17 @@ int main(int argc, char **argv)
     s = vx_drum(127, 0, 38); printf("kit 0 key 38 = %s\n", s ? s : "-"); bad += !s;
     s = vx_drum(127, 25, 36); printf("kit 25 key 36 = %s\n", s ? s : "-");
     printf("%s\n", bad ? "FAIL" : "OK");
+    s = vx_drum_of(9, 0, 0, 36); printf("ch10 GM bank key 36 = %s\n", s ? s : "-"); bad += !s;
+    s = vx_drum_of(15, 127, 25, 36); printf("ch16 kit 25 key 36 = %s\n", s ? s : "-"); bad += !s;
+    {
+        uint8_t o[128];
+        int k, seen = 0;
+        vx_drum_order(o);
+        for (k = 0; k < 128; k++) seen |= o[k] == 36;
+        printf("rows: %d %d %d ... kick kind %d, hat kind %d\n", o[0], o[30], o[40], vx_drum_kind(36), vx_drum_kind(42));
+        bad += !seen || vx_drum_kind(36) != 2 || vx_drum_kind(42) != 3;
+    }
+    printf("%s\n", bad ? "FAIL" : "OK (drums)");
     vx_free();
     return bad;
 }

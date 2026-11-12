@@ -36,6 +36,7 @@
 #include "voices.h"
 #include "mixer.h"
 #include "screen.h"
+#include "pal.h"
 #include <libraries/gadtools.h>
 
 extern struct Library *GadToolsBase;
@@ -49,9 +50,7 @@ static WORD tb, rh, cx0, gx0, gx1, gy0, gy1;
 static UWORD pen_bg = 0, pen_tx = 1, pen_sh = 2, pen_fill = 3;
 /* the colours of the PC / web Track View (XGworks): obtained on open */
 enum { C_HEAD, C_ROW, C_LANE, C_GRID, C_BLOCK, C_BSEL, C_RULER, C_WHITE, C_BLACK, C_SOLO, C_MUTE, C_CYAN, C_N };
-static const ULONG crgb[C_N] = {0x660066, 0x828282, 0x004080, 0x2060A0, 0x6666FF, 0xFF0000, 0xFFCC66, 0xFFFFFF, 0x000000, 0xD6A028, 0xC84038, 0x00DCDC};
-static LONG cpen[C_N];
-static struct ColorMap *ccm;
+static const int cmap[C_N] = {PAL_HEAD, PAL_ROW, PAL_LANE, PAL_GRID, PAL_BLOCK, PAL_RED, PAL_RULER, PAL_WHITE, PAL_BLACK, PAL_SOLO, PAL_MUTE, PAL_CYAN};
 static uint32_t cur_tick = 0xFFFFFFFFUL;   /* the play cursor (XOR line), none = ~0 */
 static uint32_t htop;          /* tick at the left */
 static int bpx = 24;           /* pixels per bar */
@@ -133,7 +132,7 @@ static void layout(void)
 static void cursor_xor(App *a);
 
 /* a colour of the PC Track View, else the screen's pen */
-static UWORD CP(int c, UWORD def) { return cpen[c] >= 0 ? (UWORD)cpen[c] : def; }
+static UWORD CP(int c, UWORD def) { return pal(cmap[c], def); }
 
 static void draw(App *a)
 {
@@ -332,16 +331,7 @@ int tv_open(App *a)
         pen_sh = dri->dri_Pens[SHINEPEN]; pen_fill = dri->dri_Pens[FILLPEN];
         FreeScreenDrawInfo(scr, dri);
     }
-    {
-        int c;
-        /* the PC colours: on a screen with few colours the nearest ones (or the screen's pens) */
-        ccm = scr->ViewPort.ColorMap;
-        for (c = 0; c < C_N; c++) {
-            ULONG r = (crgb[c] >> 16) & 255, gg = (crgb[c] >> 8) & 255, b = crgb[c] & 255;
-            cpen[c] = (ccm && scr->RastPort.BitMap->Depth >= 4)
-                ? ObtainBestPen(ccm, r * 0x01010101UL, gg * 0x01010101UL, b * 0x01010101UL, OBP_Precision, PRECISION_GUI, TAG_DONE) : -1;
-        }
-    }
+    pal_open(scr);
     vvi = GetVisualInfo(scr, TAG_DONE);
     fh = scr->Font->ta_YSize;
     {
@@ -392,7 +382,7 @@ int tv_open(App *a)
         g = g_info = CreateGadget(TEXT_KIND, g, &ng, GTTX_Text, (ULONG)"Click a track, then Demix Ch... / Demix Note... (also the right mouse button menu).", GTTX_Border, TRUE, TAG_DONE);
     }
     tb = (WORD)(y + fh + 7);
-    if (!g) { FreeGadgets(vgl); vgl = NULL; FreeVisualInfo(vvi); UnlockPubScreen(NULL, scr); return 0; }
+    if (!g) { FreeGadgets(vgl); vgl = NULL; FreeVisualInfo(vvi); UnlockPubScreen(NULL, scr); pal_close(); return 0; }
     vw = OpenWindowTags(NULL, WA_Title, (ULONG)"Track View", WA_Left, 0, WA_Top, scr->BarHeight + 1,
         WA_Width, scr->Width > 700 ? 680 : scr->Width, WA_Height, scr->Height - scr->BarHeight - 1 > 360 ? 360 : scr->Height - scr->BarHeight - 1,
         WA_MinWidth, 600, WA_MinHeight, 140, WA_MaxWidth, ~0, WA_MaxHeight, ~0,
@@ -401,7 +391,7 @@ int tv_open(App *a)
         WA_IDCMP, IDCMP_CLOSEWINDOW | IDCMP_NEWSIZE | IDCMP_REFRESHWINDOW | IDCMP_MOUSEBUTTONS | IDCMP_MOUSEMOVE | IDCMP_RAWKEY |
                   IDCMP_IDCMPUPDATE | IDCMP_GADGETUP | IDCMP_MENUPICK | INTEGERIDCMP | STRINGIDCMP | BUTTONIDCMP, TAG_DONE);
     UnlockPubScreen(NULL, scr);
-    if (!vw) { FreeGadgets(vgl); vgl = NULL; FreeVisualInfo(vvi); return 0; }
+    if (!vw) { FreeGadgets(vgl); vgl = NULL; FreeVisualInfo(vvi); pal_close(); return 0; }
     /* the Track menu on the right mouse button */
     if ((vmenu = CreateMenus(nm, TAG_DONE))) {
         if (LayoutMenus(vmenu, vvi, GTMN_NewLookMenus, TRUE, TAG_DONE)) SetMenuStrip(vw, vmenu);
@@ -439,14 +429,7 @@ void tv_close(void)
     vw = NULL;
     if (vmono) CloseFont(vmono);
     vmono = NULL;
-    {
-        int c;
-        for (c = 0; c < C_N; c++) {
-            if (cpen[c] >= 0 && ccm) ReleasePen(ccm, (ULONG)cpen[c]);
-            cpen[c] = -1;
-        }
-        ccm = NULL;
-    }
+    pal_close();
     cur_tick = 0xFFFFFFFFUL;
     if (hprop) DisposeObject(hprop);
     if (vprop) DisposeObject(vprop);

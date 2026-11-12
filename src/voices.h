@@ -22,5 +22,16 @@ const char *vx_text(uint32_t off);
 const char *vx_name(int msb, int lsb, int prog);
 /* The name of a drum key in a kit (msb 126 / 127, prog), NULL = none. */
 const char *vx_drum(int msb, int prog, int key);
+/* The name of a drum key for a channel's bank / program, as the PC version:
+ * channel 10 without a drum bank is the drum bank 127; the kit's name, else
+ * the Standard Kit's, else the GM name, else NULL. */
+const char *vx_drum_of(int ch, int msb, int prog, int key);
+/* The Drum window's rows (XGworks' inst.ini [User], read with the lists):
+ * order[row] = key, top row first; all 128 keys. Without inst.ini the
+ * highest key first. */
+void vx_drum_order(uint8_t order[128]);
+/* The kind of a drum key (inst.ini InstColor): 0 snare / brush, 1 percussion,
+ * 2 kick, 3 hi-hat, 4 cymbal, 5 tom. */
+int  vx_drum_kind(int key);
 
 #endif

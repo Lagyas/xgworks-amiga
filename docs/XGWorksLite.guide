@@ -303,11 +303,16 @@ pages. Every change is heard at once.
 @endnode
 
 @node Drums "Drum editor"
-One row per drum - the drums the track uses, or all General MIDI drums
-(@{b}Rows@{ub}) - and one column per step of the grid (bar numbers on top, the
-first beat of a bar in the fill colour). A click on a step puts a hit there
-or takes it away; new hits get the velocity @{b}Vel@{ub} (louder hits are drawn
-bigger). A click on a drum's name plays it.
+As the Drum window of the PC / web version: one row per drum - the drums
+the track uses, or all (@{b}Rows@{ub}) - in XGworks' order (brushes, cymbals,
+hi-hats, snares, kicks, toms, percussion; from inst.ini), each named after
+the drum kit of the channel (bank and program: Standard, Room, Analog ...
+Kit, from Drum Kit.ini; else the Standard Kit's, else the GM name), and one
+column per step of the grid (bar numbers on top, bar lines blue). A click on
+a step puts a hit there or takes it away; new hits get the velocity
+@{b}Vel@{ub}. The hits have the colour of the drum's kind (kick grey, snare blue,
+hi-hat orange, cymbal violet, tom light blue, percussion green) and are
+bigger when louder. A click on a drum's name plays it.
 
 It opens on the track selected in Tracks, else the track with channel 10
 notes. @{b}Grid@{ub}: 1/4 ... 1/32 and triplets; @{b}Ch@{ub}: the channel (10 for GM drums);
@@ -392,11 +397,14 @@ the job, @{b}Undo@{ub} takes it back.
 @endnode
 
 @node XG4 "Sound names (XG4)"
-The sound and drum names of the XGM editor, the mixer and the Drum editor
-come from the voice lists of your XGworks V4.0 installation. Copy these
-files into the folder @{b}XG4@{ub} next to XGWorksLite:
+The sound and drum names of the Track View, the Event List (program
+changes, drum notes), the XGM editor, the mixer and the Drum editor come
+from the voice lists of your XGworks V4.0 installation. Copy these files
+into the folder @{b}XG4@{ub} next to XGWorksLite:
 
-  Melody.ini, SFX.ini, SFX Kit.ini, Drum Kit.ini
+  Melody.ini, SFX.ini, SFX Kit.ini, Drum Kit.ini, inst.ini
+
+(inst.ini: the Drum editor's row order and the colours of the drums.)
 
 Without them General MIDI names are shown. They are read when the program
 starts; nothing of them is built into XGWorks Lite.
