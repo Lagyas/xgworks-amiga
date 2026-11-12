@@ -109,7 +109,7 @@ int app_init(App *a, const char *folder)
         /* next to the program, else in the current folder */
         int nvx = vx_load("PROGDIR:XG4");
         if (!nvx) nvx = vx_load("XG4");
-        if (nvx) snprintf(a->info, sizeof a->info, "Sound names: %d sounds%s from XG4.", nvx, vx_gs_count() ? " and the SC-8850 (GS)" : "");
+        if (nvx) snprintf(a->info, sizeof a->info, "Sound names: %d sounds%s from XG4.", nvx, vx_gs_count() ? " and GS / SC-8850 / PSR-SX900 / MU1000" : "");
         else snprintf(a->info, sizeof a->info, "No voice lists in PROGDIR:XG4 - GM names (see XG4/ReadMe).");
     }
     app_load_prefs(a);
@@ -769,6 +769,7 @@ void app_load_prefs(App *a)
         else if (!strcmp(line, "letters")) a->letters = atoi(v) % 3;
         else if (!strcmp(line, "lyricsize")) a->kfont = atoi(v) < 8 ? 24 : atoi(v);
         else if (!strcmp(line, "screen")) a->screen = atoi(v) & 3;
+        else if (!strcmp(line, "sounds")) { a->std_user = atoi(v); if (a->std_user < -1 || a->std_user >= VX_STDS) a->std_user = -1; }
     }
     fclose(f);
 }
@@ -780,7 +781,7 @@ void app_save_prefs(const App *a)
     for (k = 0; k < 2; k++) {
         FILE *f = fopen(files[k], "w");
         if (!f) continue;
-        fprintf(f, "folder=%s\nreset=%d\noutput=%d\ndevice=%s\nunit=%ld\ntempo=%d\nletters=%d\nlyricsize=%d\nscreen=%d\n", a->folder, a->reset, a->output, a->serdev, a->unit, a->pl.tempo, a->letters, a->kfont, a->screen);
+        fprintf(f, "folder=%s\nreset=%d\noutput=%d\ndevice=%s\nunit=%ld\ntempo=%d\nletters=%d\nlyricsize=%d\nscreen=%d\nsounds=%d\n", a->folder, a->reset, a->output, a->serdev, a->unit, a->pl.tempo, a->letters, a->kfont, a->screen, a->std_user);
         fclose(f);
     }
 }

@@ -18,24 +18,25 @@ void vx_free(void);
 int  vx_count(void);
 const VxVoice *vx_get(int i);
 const char *vx_text(uint32_t off);
-/* GS names (SC-8850 map from the user's midi-file-editor.html in XG4) for
- * a GS song, else the XG lists. */
-void vx_set_gs(int on);
-int  vx_gs(void);
-/* The standard of the sound names and the sound choice: */
-enum { VX_XG, VX_GM, VX_GM2, VX_GS, VX_STDS };
-extern const char *const vx_std_names[VX_STDS + 1];   /* "XG", "GM", "GM2", "GS (SC-8850)" */
+/* The standard of the sound names and the sound choice (as the web
+ * version's): GM, GM2, the GS maps, the PSR-SX900, XG (the XGworks lists)
+ * and XG MU1000 / MU2000. GS / SX900 / MU1000 come from the user's
+ * midi-file-editor.html in the XG4 folder (else GM names). */
+enum { VX_XG, VX_GM, VX_GM2, VX_GS55, VX_GS88, VX_GS88PRO, VX_GS8850, VX_SX900, VX_MU1000, VX_STDS };
+#define VX_GS VX_GS8850
+extern const char *const vx_std_names[VX_STDS + 1];
 void vx_set_std(int std);
 int  vx_std(void);
+/* GS songs: the SC-8850 (on) or XG (off). */
+void vx_set_gs(int on);
+int  vx_gs(void);                 /* a GS standard now */
+int  vx_gs_count(void);           /* the sounds of the html sets */
+/* Sound i of a standard's set (GS, SX900, MU1000): bank / program, name; 0 = no more. */
+int  vx_set_get(int std, int i, int *msb, int *lsb, int *prog, const char **name);
 /* The drum kits of a standard: kit k (0-) -> bank MSB, program, name; 0 = no more. */
 int  vx_kit(int std, int k, int *msb, int *prog, const char **name);
-int  vx_gs_count(void);
-/* GS voice i (SC-8850 list): its bank / program, the name; 0 = no more. */
-int  vx_gs_get(int i, int *msb, int *lsb, int *prog, const char **name);
-/* The GS drum kit of program `prog` (NULL = none). */
-const char *vx_gs_kit(int prog);
-/* The name of a channel's sound for display (never NULL): XG / GM2 / GS by
- * the song, the kit on channel 10, else the GM name. */
+/* The name of a channel's sound for display (never NULL), by the standard;
+ * the kit on channel 10; else the GM name. */
 const char *vx_sound(int ch, int msb, int lsb, int prog);
 /* The name of a sound (NULL = not in the lists). */
 const char *vx_name(int msb, int lsb, int prog);

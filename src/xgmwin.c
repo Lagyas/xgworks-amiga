@@ -35,7 +35,10 @@ static char (*tvars)[48];
 static struct { uint8_t m, l, p; } *vch;   /* the sounds of the right list: bank MSB / LSB, program */
 static int nvarn;
 /* the standard of the sounds (as the web version's sound choice): Auto = by the song */
-static const char *const STDS[] = {"Auto (song)", "XG", "GM", "GM2", "GS (SC-8850)", NULL};
+static const char *const STDS[] = {"Auto (song)", "XG", "GM", "GM2", "GS (SC-55)", "GS (SC-88)", "GS (SC-88Pro)", "GS (SC-8850)",
+                                   "Yamaha PSR-SX900", "XG MU1000/MU2000", NULL};
+/* XG-like: bank MSB 126 / 127 are kits, 64 SFX */
+#define XGLIKE(s) ((s) == VX_XG || (s) == VX_MU1000 || (s) == VX_SX900)
 static char soundbuf[64];
 
 static const char *const PARTS[] = {"Part 1", "Part 2", "Part 3", "Part 4", "Part 5", "Part 6", "Part 7", "Part 8", "Part 9",
@@ -52,8 +55,9 @@ static void fill_progs(void)
     for (p = 0; p < 130; p++) {
         if (p < 128) {
             const char *n = std == VX_XG ? vx_name(0, 0, p) : vx_sound(0, std == VX_GM2 ? 121 : 0, 0, p);
+            if (std == VX_XG && !n) n = vx_sound(0, 0, 0, p);
             snprintf(tprogs[p], sizeof tprogs[p], "%3d %s", p + 1, n ? n : mx_gm_names[p]);
-        } else snprintf(tprogs[p], sizeof tprogs[p], "%s", p == 128 ? (std == VX_XG ? "--- SFX ---" : "--- (no SFX bank) ---") : "--- Drum kits ---");
+        } else snprintf(tprogs[p], sizeof tprogs[p], "%s", p == 128 ? (XGLIKE(std) ? "--- SFX ---" : "--- (no SFX bank) ---") : "--- Drum kits ---");
         nprogs[p].ln_Name = tprogs[p];
         AddTail(&lprogs, &nprogs[p]);
     }
@@ -91,24 +95,32 @@ static void fill_vars(int p)
             add_var(m, 0, pr, t);
         }
     } else if (p == 128) {
-        for (i = 0; std == VX_XG && i < vx_count() && nvarn < cnt; i++) {
+        int gm, gl, gp;
+        const char *gn;
+        /* the SFX bank (MSB 64): of the set (MU1000 / SX900), else of the XGworks lists */
+        for (i = 0; XGLIKE(std) && nvarn < cnt && vx_set_get(std, i, &gm, &gl, &gp, &gn); i++)
+            if (gm == 64) {
+                snprintf(t, sizeof t, "%3d/%-3d %s", gm, gp + 1, gn);
+                add_var(gm, gl, gp, t);
+            }
+        for (i = 0; XGLIKE(std) && !nvarn && i < vx_count() && nvarn < cnt; i++) {
             const VxVoice *v = vx_get(i);
             if (v->msb != 64) continue;
             snprintf(t, sizeof t, "%3d/%-3d %s", v->msb, v->prog + 1, vx_text(v->name));
             add_var(64, 0, v->prog, t);
         }
     } else {
+        int gm, gl, gp;
+        const char *gn;
         first = 1;
-        if (std == VX_GS) {
-            /* the SC-8850 variations (bank MSB) of the program */
-            int gm, gl, gp;
-            const char *gn;
-            for (i = 0; nvarn < cnt && vx_gs_get(i, &gm, &gl, &gp, &gn); i++)
-                if (gp == p) {
+        if (vx_set_get(std, 0, &gm, &gl, &gp, &gn)) {
+            /* a set of the html (GS maps, SC-8850, PSR-SX900, MU1000): the banks of the program */
+            for (i = 0; nvarn < cnt && vx_set_get(std, i, &gm, &gl, &gp, &gn); i++)
+                if (gp == p && gm < 126 && gm != 64) {
                     snprintf(t, sizeof t, "%3d/%-3d %s", gm, gl, gn);
                     add_var(gm, gl, gp, t);
                 }
-        } else if (std == VX_XG || std == VX_GM2) {
+        } else if (XGLIKE(std) || std == VX_GM2) {
             /* XG: every bank of the lists (MU voices, MU Sampling, VL, PLG, GM2 ...); GM2: MSB 121 */
             for (i = 0; i < vx_count() && nvarn < cnt; i++) {
                 const VxVoice *v = vx_get(i);
@@ -120,10 +132,10 @@ static void fill_vars(int p)
         }
         (void)first;
         if (!nvarn) {
-            /* GM, or no lists: the GM sound */
-            int m = std == VX_GM2 ? 121 : 0;
-            snprintf(t, sizeof t, "%3d/0   %s", m, mx_gm_names[p]);
-            add_var(m, 0, p, t);
+            /* GM, or no lists: the GM sound (GS: on the module's map) */
+            int m = std == VX_GM2 ? 121 : 0, l = std == VX_GS55 ? 1 : std == VX_GS88 ? 2 : std == VX_GS88PRO ? 3 : std == VX_GS8850 ? 4 : 0;
+            snprintf(t, sizeof t, "%3d/%-3d %s", m, l, mx_gm_names[p]);
+            add_var(m, l, p, t);
         }
     }
     GT_SetGadgetAttrs(g_vars, xw, NULL, GTLV_Labels, (ULONG)&lvars, TAG_DONE);
@@ -133,10 +145,10 @@ static void fill_vars(int p)
 static int prog_row(const uint8_t *v)
 {
     int std = vx_std();
-    if (xpart == 9 && std != VX_XG) return 129;
-    if (std == VX_XG && (v[MX_MSB] >= 126 || v[MX_MSB] == 120 || (xpart == 9 && v[MX_MSB] == 0))) return 129;
+    if (xpart == 9 && !XGLIKE(std)) return 129;
+    if (XGLIKE(std) && (v[MX_MSB] >= 126 || v[MX_MSB] == 120 || (xpart == 9 && v[MX_MSB] == 0))) return 129;
     if (std == VX_GM2 && v[MX_MSB] == 120) return 129;
-    if (std == VX_XG && v[MX_MSB] == 64) return 128;
+    if (XGLIKE(std) && v[MX_MSB] == 64) return 128;
     return v[MX_PROG] & 127;
 }
 
@@ -200,9 +212,9 @@ int xw_open(App *a)
     NewList(&lvars);
     ng.ng_TopEdge = y; ng.ng_Height = fh + 4; ng.ng_LeftEdge = x0; ng.ng_Width = 90; ng.ng_GadgetID = X_PART;
     g = g_part = CreateGadget(CYCLE_KIND, g, &ng, GTCY_Labels, (ULONG)PARTS, GTCY_Active, xpart, TAG_DONE);
-    ng.ng_LeftEdge = x0 + 94; ng.ng_Width = 136; ng.ng_GadgetID = X_STD;
+    ng.ng_LeftEdge = x0 + 94; ng.ng_Width = 180; ng.ng_GadgetID = X_STD;
     g = g_std = CreateGadget(CYCLE_KIND, g, &ng, GTCY_Labels, (ULONG)STDS, GTCY_Active, a->std_user + 1, TAG_DONE);
-    ng.ng_LeftEdge = x0 + 234; ng.ng_Width = lw * 2 - 234 + 4; ng.ng_GadgetID = X_SOUND;
+    ng.ng_LeftEdge = x0 + 278; ng.ng_Width = lw * 2 - 278 + 4; ng.ng_GadgetID = X_SOUND;
     g = g_sound = CreateGadget(TEXT_KIND, g, &ng, GTTX_Text, (ULONG)"", GTTX_Border, TRUE, TAG_DONE);
     y += fh + 8;
     y += fh + 2;

@@ -143,11 +143,17 @@ editor (the drum kits listed), or with XGM... in the main window. One part (@{b}
 a time:
 
   @{b}Standard@{ub}  (the second cycle) the sound set, as the web version's:
-               Auto (song) - GS for a GS song, GM for the Reset GM, else
-               XG - or @{b}XG@{ub} (every bank of the XG4 lists), @{b}GM@{ub} (the 128 GM
-               sounds, Standard kit), @{b}GM2@{ub} (bank MSB 121 / kits 120),
-               @{b}GS (SC-8850)@{ub} (its variations and kits). The names everywhere
-               follow it.
+               @{b}Auto (song)@{ub}  GS for a GS song, GM for the Reset GM, else XG
+               @{b}XG@{ub}           every bank of the XG4 lists (MU2000 ... PLG)
+               @{b}GM@{ub}           the 128 GM sounds, the Standard kit
+               @{b}GM2@{ub}          bank MSB 121 with its variations, kits 120
+               @{b}GS (SC-55)@{ub}, @{b}(SC-88)@{ub}, @{b}(SC-88Pro)@{ub}   the GS map (LSB 1 / 2 / 3)
+               @{b}GS (SC-8850)@{ub} its variations (LSB 4) and kits
+               @{b}Yamaha PSR-SX900@{ub}  the keyboard's voices and kits
+               @{b}XG MU1000/MU2000@{ub}  the MU1000 / MU2000 voice list
+               GS, SC-8850, PSR-SX900 and MU1000 come from your
+               midi-file-editor.html in XG4 (else GM names). The names
+               everywhere follow the choice; it is kept in the prefs.
   @{b}Sound@{ub}   the sound now (bank MSB / LSB / program and its name)
   1. Program   the 128 programs, then SFX and the drum kits: a click sets
                the program's main sound

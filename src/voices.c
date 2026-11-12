@@ -179,20 +179,27 @@ static int load_ws(const char *dir)
     return count;
 }
 
-/* ---- GS (SC-8850) from the user's midi-file-editor.html ---- */
-typedef struct { uint8_t msb, lsb, prog; uint32_t name; } GsVoice;
-static GsVoice *gsv;
-static int ngs, capgs, vstd;
-#define gs_on (vstd == VX_GS)
-const char *const vx_std_names[VX_STDS + 1] = {"XG", "GM", "GM2", "GS (SC-8850)", NULL};
+/* ---- the sound sets of the user's midi-file-editor.html (as the web version):
+   GS_VOICES (the GS map), SC8850_VOICES, SX900_VOICES (PSR-SX900),
+   MU1000_VOICES (XG MU1000 / MU2000) and the GS / GM2 kit lists ---- */
+enum { S_GS, S_8850, S_SX, S_MU, S_N };
+typedef struct { uint8_t set, msb, lsb, prog; uint32_t name; } SetVoice;
+static SetVoice *sv;
+static int nsv, capsv, vstd;
+static int nset[S_N];
+const char *const vx_std_names[VX_STDS + 1] = {"XG", "GM", "GM2", "GS (SC-55)", "GS (SC-88)", "GS (SC-88Pro)", "GS (SC-8850)",
+                                               "Yamaha PSR-SX900", "XG MU1000 / MU2000", NULL};
+#define IS_GS(s) ((s) >= VX_GS55 && (s) <= VX_GS8850)
 /* the kits every GM2 / GS module has, by program (generic names) */
 static const struct { uint8_t prog; const char *name; } STD_KITS[] = {
     {0, "Standard"}, {8, "Room"}, {16, "Power"}, {24, "Electronic"}, {25, "Analog"}, {32, "Jazz"}, {40, "Brush"}, {48, "Orchestra"}, {56, "SFX"},
 };
-static uint32_t gskit[128];
-static uint8_t gskit_has[128];
+/* the kit lists of the html: GS_DRUM_KITS (SC-8850), GS_BASE_DRUM_KITS (the GS map) */
+static uint32_t gskit[2][128];
+static uint8_t gskit_has[2][128];
 
-/* one JS value of a row: a number or a string ('...' / "..."), *p after it */
+/* one JS value of a row: a number or a string ('...' / "..."), *p after it;
+   letters beyond ASCII (UTF-8) as '?' */
 static int js_value(const char **pp, long *num, char *str, int max)
 {
     const char *p = *pp;
@@ -201,13 +208,17 @@ static int js_value(const char **pp, long *num, char *str, int max)
         char q = *p++;
         int o = 0;
         while (*p && *p != q) {
-            char c = *p++;
+            unsigned char c = (unsigned char)*p++;
             if (c == '\\' && *p) {
-                c = *p++;
+                c = (unsigned char)*p++;
                 if (c == 'u') { int h; for (h = 0; h < 4 && *p; h++) p++; c = '?'; }
                 else if (c == 'n' || c == 't') c = ' ';
+            } else if (c >= 0x80) {
+                /* one UTF-8 letter: its continuation bytes skipped */
+                while ((unsigned char)*p >= 0x80 && (unsigned char)*p < 0xC0) p++;
+                c = '?';
             }
-            if (o < max - 1) str[o++] = c;
+            if (o < max - 1) str[o++] = (char)c;
         }
         str[o] = 0;
         if (*p) p++;
@@ -224,7 +235,7 @@ static int js_value(const char **pp, long *num, char *str, int max)
 }
 
 /* `const NAME = [[...], ...]`: calls row() for each row (up to 6 values) */
-static void js_rows(const char *src, const char *name, void (*row)(int n, const long *num, char str[][64]))
+static void js_rows(const char *src, const char *name, int set, void (*row)(int set, int n, const long *num, char str[][64]))
 {
     char head[64];
     const char *p;
@@ -252,54 +263,100 @@ static void js_rows(const char *src, const char *name, void (*row)(int n, const 
         while (*p && *p != ']') p++;
         if (!*p) return;
         p++;
-        row(n, num, str);
+        row(set, n, num, str);
     }
 }
 
-static void gs_row(int n, const long *num, char str[][64])
+/* a voice row: [msb, lsb, prog, name] (GS), [msb, lsb, prog, group, name, ...] (SX900, MU1000) */
+static void voice_row(int set, int n, const long *num, char str[][64])
 {
-    if (n < 4 || num[0] < 0 || num[0] > 127 || num[1] < 0 || num[1] > 127 || num[2] < 0 || num[2] > 127 || !str[3][0]) return;
-    if (ngs == capgs) {
-        GsVoice *x = (GsVoice *)realloc(gsv, (size_t)(capgs = capgs ? capgs * 2 : 512) * sizeof(GsVoice));
+    int ni = set == S_SX || set == S_MU ? 4 : 3;
+    if (n <= ni || num[0] < 0 || num[0] > 127 || num[1] < 0 || num[1] > 127 || num[2] < 0 || num[2] > 127 || !str[ni][0]) return;
+    if (nsv == capsv) {
+        SetVoice *x = (SetVoice *)realloc(sv, (size_t)(capsv = capsv ? capsv * 2 : 1024) * sizeof(SetVoice));
         if (!x) return;
-        gsv = x;
+        sv = x;
     }
-    gsv[ngs].msb = (uint8_t)num[0]; gsv[ngs].lsb = (uint8_t)num[1]; gsv[ngs].prog = (uint8_t)num[2];
-    gsv[ngs].name = add_name(str[3], strlen(str[3]));
-    ngs++;
+    sv[nsv].set = (uint8_t)set;
+    sv[nsv].msb = (uint8_t)num[0]; sv[nsv].lsb = (uint8_t)num[1]; sv[nsv].prog = (uint8_t)num[2];
+    sv[nsv].name = add_name(str[ni], strlen(str[ni]));
+    nsv++;
+    nset[set]++;
 }
 
-static void gs_kit_row(int n, const long *num, char str[][64])
+static void kit_row(int set, int n, const long *num, char str[][64])
 {
     if (n < 2 || !str[0][0] || num[1] < 0 || num[1] > 127) return;
-    gskit[num[1]] = add_name(str[0], strlen(str[0]));
-    gskit_has[num[1]] = 1;
+    gskit[set][num[1]] = add_name(str[0], strlen(str[0]));
+    gskit_has[set][num[1]] = 1;
 }
 
-static void load_gs(const char *dir)
+static void load_sets(const char *dir)
 {
     long n;
     char *b = read_file(dir, "midi-file-editor.html", &n);
     if (!b) return;
-    js_rows(b, "SC8850_VOICES", gs_row);
-    js_rows(b, "GS_DRUM_KITS", gs_kit_row);
+    js_rows(b, "GS_VOICES", S_GS, voice_row);
+    js_rows(b, "SC8850_VOICES", S_8850, voice_row);
+    js_rows(b, "SX900_VOICES", S_SX, voice_row);
+    js_rows(b, "MU1000_VOICES", S_MU, voice_row);
+    js_rows(b, "GS_DRUM_KITS", 0, kit_row);
+    js_rows(b, "GS_BASE_DRUM_KITS", 1, kit_row);
     free(b);
 }
 
-void vx_set_gs(int on) { vstd = on ? VX_GS : VX_XG; }
+/* the set of a standard (-1 = none: the XGworks lists or GM) */
+static int set_of(int std)
+{
+    switch (std) {
+    case VX_GS55: case VX_GS88: case VX_GS88PRO: return nset[S_GS] ? S_GS : nset[S_8850] ? S_8850 : -1;
+    case VX_GS8850: return nset[S_8850] ? S_8850 : nset[S_GS] ? S_GS : -1;
+    case VX_SX900: return nset[S_SX] ? S_SX : -1;
+    case VX_MU1000: return nset[S_MU] ? S_MU : -1;
+    default: return -1;
+    }
+}
+
+/* the GS map's LSB of a GS standard */
+static int gs_map(int std) { return std == VX_GS55 ? 1 : std == VX_GS88 ? 2 : std == VX_GS88PRO ? 3 : 4; }
+
+void vx_set_gs(int on) { vstd = on ? VX_GS8850 : VX_XG; }
 void vx_set_std(int std) { vstd = std >= 0 && std < VX_STDS ? std : VX_XG; }
 int vx_std(void) { return vstd; }
+int vx_gs(void) { return IS_GS(vstd); }
+int vx_gs_count(void) { return nsv; }
+
+int vx_set_get(int std, int i, int *msb, int *lsb, int *prog, const char **name)
+{
+    int set = set_of(std), k, n = 0;
+    if (set < 0) return 0;
+    for (k = 0; k < nsv; k++)
+        if (sv[k].set == set && n++ == i) {
+            *msb = sv[k].msb; *prog = sv[k].prog; *name = names + sv[k].name;
+            /* GS: the map of the chosen module */
+            *lsb = IS_GS(std) ? gs_map(std) : sv[k].lsb;
+            return 1;
+        }
+    return 0;
+}
 
 int vx_kit(int std, int k, int *msb, int *prog, const char **name)
 {
-    int i, n = 0;
+    int i, n = 0, set = set_of(std);
     if (std == VX_GM) {
         if (k) return 0;
         *msb = 0; *prog = 0; *name = "Standard";
         return 1;
     }
+    if (std == VX_SX900 || std == VX_MU1000) {
+        /* the kits of the set (MSB 126 / 127) */
+        for (i = 0; set >= 0 && i < nsv; i++)
+            if (sv[i].set == set && sv[i].msb >= 126 && n++ == k) { *msb = sv[i].msb; *prog = sv[i].prog; *name = names + sv[i].name; return 1; }
+        if (n || set >= 0) return 0;
+        std = VX_XG;
+    }
     if (std == VX_XG || std == VX_GM2) {
-        /* the kits of the lists (XG: MSB 127 / 126, GM2: 120) */
+        /* the kits of the XGworks lists (XG: MSB 127 / 126, GM2: 120) */
         for (i = 0; i < nv; i++) {
             int m = vv[i].msb;
             if (std == VX_XG ? m >= 126 : m == 120) {
@@ -308,15 +365,17 @@ int vx_kit(int std, int k, int *msb, int *prog, const char **name)
         }
         if (n) return 0;
     }
-    if (std == VX_GS)
+    if (IS_GS(std)) {
+        int t = std == VX_GS8850 ? 0 : 1;
         for (i = 0; i < 128; i++)
-            if (gskit_has[i] && n++ == k) { *msb = 0; *prog = i; *name = names + gskit[i]; return 1; }
-    if (n) return 0;
+            if (gskit_has[t][i] && n++ == k) { *msb = 0; *prog = i; *name = names + gskit[t][i]; return 1; }
+        if (n) return 0;
+    }
     /* no lists: the kits of the standard */
     if (k < 0 || k >= (int)(sizeof STD_KITS / sizeof STD_KITS[0])) return 0;
     *msb = std == VX_GM2 ? 120 : std == VX_XG ? 127 : 0;
     *prog = STD_KITS[k].prog;
-    *name = std == VX_GS && STD_KITS[k].prog == 25 ? "TR-808" : STD_KITS[k].name;
+    *name = IS_GS(std) && STD_KITS[k].prog == 25 ? "TR-808" : STD_KITS[k].name;
     return 1;
 }
 
@@ -328,33 +387,30 @@ static const char *std_kit_name(int prog)
     return "Standard";
 }
 
-int vx_gs_get(int i, int *msb, int *lsb, int *prog, const char **name)
+/* a sound of a set: the bank (MSB, LSB when the set has them), else its capital tone (MSB 0) */
+static const char *set_name(int set, int msb, int lsb, int prog)
 {
-    if (i < 0 || i >= ngs) return 0;
-    *msb = gsv[i].msb; *lsb = gsv[i].lsb; *prog = gsv[i].prog; *name = names + gsv[i].name;
-    return 1;
+    int i, pass, uselsb = set == S_SX || set == S_MU;
+    for (pass = 0; pass < 2; pass++)
+        for (i = 0; i < nsv; i++)
+            if (sv[i].set == set && sv[i].prog == prog && sv[i].msb == (pass ? 0 : msb) && (!uselsb || pass || sv[i].lsb == lsb))
+                return names + sv[i].name;
+    return NULL;
 }
 
-const char *vx_gs_kit(int prog) { return prog >= 0 && prog < 128 && gskit_has[prog] ? names + gskit[prog] : NULL; }
-int vx_gs(void) { return gs_on; }
-int vx_gs_count(void) { return ngs; }
-
-/* GS: the SC-8850 map (LSB 0 / 4 and the older maps by their numbers),
-   the variation (MSB), else its capital tone (MSB 0) */
-static const char *gs_name(int msb, int lsb, int prog)
+static const char *gs_kit_name(int std, int prog)
 {
-    int i, pass;
-    for (pass = 0; pass < 2; pass++)
-        for (i = 0; i < ngs; i++)
-            if (gsv[i].prog == prog && gsv[i].msb == (pass ? 0 : msb) && (gsv[i].lsb == lsb || lsb == 0 || lsb > 4 || gsv[i].lsb == 4))
-                return names + gsv[i].name;
-    return NULL;
+    int t = std == VX_GS8850 ? 0 : 1;
+    if (gskit_has[t][prog]) return names + gskit[t][prog];
+    if (gskit_has[t][prog & 0x78]) return names + gskit[t][prog & 0x78];
+    return std_kit_name(prog);
 }
 
 const char *vx_sound(int ch, int msb, int lsb, int prog)
 {
     const char *n;
     extern const char *const mx_gm_names[128];
+    int set = set_of(vstd);
     prog &= 127;
     if (vstd == VX_GM) return (ch & 15) == 9 ? "Standard" : mx_gm_names[prog];
     if (vstd == VX_GM2) {
@@ -363,11 +419,16 @@ const char *vx_sound(int ch, int msb, int lsb, int prog)
         n = vx_name(121, lsb, prog);
         return n ? n : mx_gm_names[prog];
     }
-    if (gs_on) {
+    if (IS_GS(vstd)) {
         /* GS: channel 10 plays the kit of the program */
-        if ((ch & 15) == 9) return gskit_has[prog] ? names + gskit[prog] : gskit_has[prog & 0x78] ? names + gskit[prog & 0x78] : std_kit_name(prog);
-        n = gs_name(msb, lsb, prog);
+        if ((ch & 15) == 9) return gs_kit_name(vstd, prog);
+        n = set >= 0 ? set_name(set, msb, lsb, prog) : NULL;
         return n ? n : mx_gm_names[prog];
+    }
+    if (vstd == VX_SX900 || vstd == VX_MU1000) {
+        int m = (ch & 15) == 9 && msb < 126 ? 127 : msb;
+        n = set >= 0 ? set_name(set, m, m >= 126 ? 0 : lsb, prog) : NULL;
+        if (n) return n;
     }
     /* XG / GM: channel 10 without a drum bank is the drum bank */
     if ((ch & 15) == 9 && msb < 126 && msb != 120) msb = 127;
@@ -462,7 +523,7 @@ int vx_drum_kind(int key)
 const char *vx_drum_of(int ch, int msb, int prog, int key)
 {
     const char *n;
-    if (vstd == VX_GM || vstd == VX_GS) return dr_gm_names[key & 127];
+    if (vstd == VX_GM || IS_GS(vstd) || vstd == VX_SX900) return dr_gm_names[key & 127];
     if (vstd == VX_GM2) {
         n = vx_drum(120, prog, key);
         if (!n) n = vx_drum(120, 0, key);
@@ -494,8 +555,8 @@ int vx_load(const char *dir)
         load_list(dir, "SFX Kit.ini", 126, 1);
         load_list(dir, "Drum Kit.ini", 127, 1);
     }
-    /* the SC-8850 (GS) names, when the user's midi-file-editor.html is there */
-    load_gs(dir);
+    /* the GS / SC-8850 / PSR-SX900 / MU1000 sets, when the user's midi-file-editor.html is there */
+    load_sets(dir);
     if (nv) qsort(vv, (size_t)nv, sizeof(VxVoice), voice_cmp);
     if (nd) qsort(dr, (size_t)nd, sizeof(VxDrum), drum_cmp);
     return nv;
@@ -503,9 +564,10 @@ int vx_load(const char *dir)
 
 void vx_free(void)
 {
-    free(vv); free(names); free(dr); free(gsv);
-    vv = NULL; names = NULL; dr = NULL; gsv = NULL;
-    nv = capv = nd = capd = ngs = capgs = 0;
+    free(vv); free(names); free(dr); free(sv);
+    vv = NULL; names = NULL; dr = NULL; sv = NULL;
+    nv = capv = nd = capd = nsv = capsv = 0;
+    memset(nset, 0, sizeof nset);
     memset(gskit_has, 0, sizeof gskit_has);
     nnames = capnames = 0;
 }
