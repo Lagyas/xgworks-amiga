@@ -142,6 +142,12 @@ channel), with Sound / bank... of the Track menu, with @{b}Kit...@{ub} of the Dr
 editor (the drum kits listed), or with XGM... in the main window. One part (@{b}Part 1-16@{ub}) at
 a time:
 
+  @{b}Standard@{ub}  (the second cycle) the sound set, as the web version's:
+               Auto (song) - GS for a GS song, GM for the Reset GM, else
+               XG - or @{b}XG@{ub} (every bank of the XG4 lists), @{b}GM@{ub} (the 128 GM
+               sounds, Standard kit), @{b}GM2@{ub} (bank MSB 121 / kits 120),
+               @{b}GS (SC-8850)@{ub} (its variations and kits). The names everywhere
+               follow it.
   @{b}Sound@{ub}   the sound now (bank MSB / LSB / program and its name)
   1. Program   the 128 programs, then SFX and the drum kits: a click sets
                the program's main sound
@@ -419,7 +425,10 @@ folder @{b}XG4@{ub} next to XGWorksLite:
   midi-file-editor.html   (when you have it) the GS names of the SC-8850
 
 Without ws.ini only Melody.ini, SFX.ini, SFX Kit.ini and Drum Kit.ini are
-read. A GS song (the Reset choice GS, or "Song's own" with GS messages in
+read. Without any lists the GM names are used - for the drums the GM Level 2
+names (keys 27-87), built in - and the standard kits (Standard, Room, Power,
+Electronic, Analog, Jazz, Brush, Orchestra, SFX). The Drum editor's title
+says how many sounds were read. A GS song (the Reset choice GS, or "Song's own" with GS messages in
 the song) shows the SC-8850 names (bank MSB = variation, LSB = map); its
 drums have the GM names.
 

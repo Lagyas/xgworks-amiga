@@ -251,8 +251,11 @@ static void title(App *a)
     if (nm) { uint32_t l = len > 40 ? 40 : len; memcpy(n, nm, l); n[l] = 0; }
     {
         int kc = kit_channel(a);
-        snprintf(t, sizeof t, "Drums - %d %s - ch %d %s (%d sounds)", dtrk + 1, n, kc + 1,
-                 vx_sound(kc, a->mx.val[kc][MX_MSB], a->mx.val[kc][MX_LSB], a->mx.val[kc][MX_PROG]), vx_count());
+        char cnt[40];
+        if (vx_count()) snprintf(cnt, sizeof cnt, "%d sounds", vx_count());
+        else snprintf(cnt, sizeof cnt, "no XG4 lists: GM2 names");
+        snprintf(t, sizeof t, "Drums - %d %s - ch %d %s (%s)", dtrk + 1, n, kc + 1,
+                 vx_sound(kc, a->mx.val[kc][MX_MSB], a->mx.val[kc][MX_LSB], a->mx.val[kc][MX_PROG]), cnt);
     }
     SetWindowTitles(dw, (CONST_STRPTR)t, (CONST_STRPTR)~0);
 }

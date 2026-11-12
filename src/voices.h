@@ -22,6 +22,13 @@ const char *vx_text(uint32_t off);
  * a GS song, else the XG lists. */
 void vx_set_gs(int on);
 int  vx_gs(void);
+/* The standard of the sound names and the sound choice: */
+enum { VX_XG, VX_GM, VX_GM2, VX_GS, VX_STDS };
+extern const char *const vx_std_names[VX_STDS + 1];   /* "XG", "GM", "GM2", "GS (SC-8850)" */
+void vx_set_std(int std);
+int  vx_std(void);
+/* The drum kits of a standard: kit k (0-) -> bank MSB, program, name; 0 = no more. */
+int  vx_kit(int std, int k, int *msb, int *prog, const char **name);
 int  vx_gs_count(void);
 /* GS voice i (SC-8850 list): its bank / program, the name; 0 = no more. */
 int  vx_gs_get(int i, int *msb, int *lsb, int *prog, const char **name);

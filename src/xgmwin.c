@@ -21,10 +21,10 @@
 
 extern struct Library *GadToolsBase;
 
-enum { X_PART = 1, X_PROGS, X_VARS, X_DEFAULT, X_SOUND, X_SL0 = 20 };
+enum { X_PART = 1, X_PROGS, X_VARS, X_DEFAULT, X_SOUND, X_STD, X_SL0 = 20 };
 
 static struct Window *xw;
-static struct Gadget *xgl, *g_progs, *g_vars, *g_sound, *g_part, *g_sl[XP_N];
+static struct Gadget *xgl, *g_progs, *g_vars, *g_sound, *g_part, *g_std, *g_sl[XP_N];
 static void *xvi;
 static int xpart, xprog = -1;
 static struct List lprogs, lvars;
@@ -32,7 +32,10 @@ static struct Node nprogs[130];
 static char tprogs[130][44];
 static struct Node *nvars;
 static char (*tvars)[48];
-static int *vidx, nvarn;
+static struct { uint8_t m, l, p; } *vch;   /* the sounds of the right list: bank MSB / LSB, program */
+static int nvarn;
+/* the standard of the sounds (as the web version's sound choice): Auto = by the song */
+static const char *const STDS[] = {"Auto (song)", "XG", "GM", "GM2", "GS (SC-8850)", NULL};
 static char soundbuf[64];
 
 static const char *const PARTS[] = {"Part 1", "Part 2", "Part 3", "Part 4", "Part 5", "Part 6", "Part 7", "Part 8", "Part 9",
@@ -44,67 +47,97 @@ unsigned long xw_signal(void) { return xw ? 1UL << xw->UserPort->mp_SigBit : 0; 
 /* the program list: 128 programs, then the SFX and the drum kits */
 static void fill_progs(void)
 {
-    int p;
+    int p, std = vx_std();
     NewList(&lprogs);
     for (p = 0; p < 130; p++) {
         if (p < 128) {
-            const char *n = vx_gs() ? vx_sound(0, 0, 0, p) : vx_name(0, 0, p);
+            const char *n = std == VX_XG ? vx_name(0, 0, p) : vx_sound(0, std == VX_GM2 ? 121 : 0, 0, p);
             snprintf(tprogs[p], sizeof tprogs[p], "%3d %s", p + 1, n ? n : mx_gm_names[p]);
-        } else snprintf(tprogs[p], sizeof tprogs[p], "%s", p == 128 ? (vx_gs() ? "--- (GS: no SFX bank) ---" : "--- SFX ---") : "--- Drum kits ---");
+        } else snprintf(tprogs[p], sizeof tprogs[p], "%s", p == 128 ? (std == VX_XG ? "--- SFX ---" : "--- (no SFX bank) ---") : "--- Drum kits ---");
         nprogs[p].ln_Name = tprogs[p];
         AddTail(&lprogs, &nprogs[p]);
     }
 }
 
-/* the variations of program `p` (128 = SFX, 129 = kits) */
+static void add_var(int m, int l, int pr, const char *text)
+{
+    snprintf(tvars[nvarn], 48, "%s", text);
+    nvars[nvarn].ln_Name = tvars[nvarn];
+    AddTail(&lvars, &nvars[nvarn]);
+    vch[nvarn].m = (uint8_t)m; vch[nvarn].l = (uint8_t)l; vch[nvarn].p = (uint8_t)pr;
+    nvarn++;
+}
+
+/* the sounds of program `p` in the banks of the standard (128 = SFX, 129 = kits) */
 static void fill_vars(int p)
 {
-    int i, n = 0, cnt = vx_count();
+    int i, cnt = vx_count() + vx_gs_count() + 200, std = vx_std(), first;
+    char t[48];
     GT_SetGadgetAttrs(g_vars, xw, NULL, GTLV_Labels, ~0UL, TAG_DONE);
-    free(nvars); free(tvars); free(vidx);
-    nvars = NULL; tvars = NULL; vidx = NULL; nvarn = 0;
+    free(nvars); free(tvars); free(vch);
+    nvars = NULL; tvars = NULL; vch = NULL; nvarn = 0;
     NewList(&lvars);
-    if (vx_gs() && cnt < vx_gs_count() + 128) cnt = vx_gs_count() + 128;
-    if (cnt && (nvars = (struct Node *)calloc((size_t)cnt + 1, sizeof(struct Node))) && (tvars = (char (*)[48])calloc((size_t)cnt + 1, 48)) &&
-        (vidx = (int *)calloc((size_t)cnt + 1, sizeof(int)))) {
-        if (vx_gs()) {
-            /* GS (SC-8850): the variations (MSB) of the program, or the kits */
-            int gm, gl, gp, j;
-            const char *gn;
-            for (j = 0; p < 128 && n < cnt && vx_gs_get(j, &gm, &gl, &gp, &gn); j++)
-                if (gp == p) {
-                    snprintf(tvars[n], 48, "%3d/%-3d %s", gm, gl, gn);
-                    nvars[n].ln_Name = tvars[n];
-                    AddTail(&lvars, &nvars[n]);
-                    vidx[n++] = -1 - j;
-                }
-            for (j = 0; p == 129 && j < 128 && n < cnt; j++)
-                if ((gn = vx_gs_kit(j))) {
-                    snprintf(tvars[n], 48, "%3d %s", j + 1, gn);
-                    nvars[n].ln_Name = tvars[n];
-                    AddTail(&lvars, &nvars[n]);
-                    vidx[n++] = -1000 - j;
-                }
+    if (!(nvars = (struct Node *)calloc((size_t)cnt, sizeof(struct Node))) || !(tvars = (char (*)[48])calloc((size_t)cnt, 48)) ||
+        !(vch = calloc((size_t)cnt, sizeof *vch))) {
+        GT_SetGadgetAttrs(g_vars, xw, NULL, GTLV_Labels, (ULONG)&lvars, TAG_DONE);
+        return;
+    }
+    if (p == 129) {
+        /* the drum kits of the standard */
+        int m, pr;
+        const char *n;
+        for (i = 0; nvarn < cnt && vx_kit(std, i, &m, &pr, &n); i++) {
+            snprintf(t, sizeof t, "%3d/%-3d %s", m, pr + 1, n);
+            add_var(m, 0, pr, t);
         }
-        for (i = 0; i < cnt && !vx_gs(); i++) {
+    } else if (p == 128) {
+        for (i = 0; std == VX_XG && i < vx_count() && nvarn < cnt; i++) {
             const VxVoice *v = vx_get(i);
-            int kit = v->msb >= 126 || v->msb == 120;   /* XG, SFX and GM2 kits */
-            int ok = p < 128 ? (v->prog == p && !kit) : p == 128 ? v->msb == 64 : kit;
-            if (!ok) continue;
-            snprintf(tvars[n], 48, "%3d/%-3d %s", v->msb, p < 128 ? v->lsb : v->prog + 1, vx_text(v->name));
-            nvars[n].ln_Name = tvars[n];
-            AddTail(&lvars, &nvars[n]);
-            vidx[n++] = i;
+            if (v->msb != 64) continue;
+            snprintf(t, sizeof t, "%3d/%-3d %s", v->msb, v->prog + 1, vx_text(v->name));
+            add_var(64, 0, v->prog, t);
+        }
+    } else {
+        first = 1;
+        if (std == VX_GS) {
+            /* the SC-8850 variations (bank MSB) of the program */
+            int gm, gl, gp;
+            const char *gn;
+            for (i = 0; nvarn < cnt && vx_gs_get(i, &gm, &gl, &gp, &gn); i++)
+                if (gp == p) {
+                    snprintf(t, sizeof t, "%3d/%-3d %s", gm, gl, gn);
+                    add_var(gm, gl, gp, t);
+                }
+        } else if (std == VX_XG || std == VX_GM2) {
+            /* XG: every bank of the lists (MU voices, MU Sampling, VL, PLG, GM2 ...); GM2: MSB 121 */
+            for (i = 0; i < vx_count() && nvarn < cnt; i++) {
+                const VxVoice *v = vx_get(i);
+                if (v->prog != p || v->msb >= 126 || v->msb == 120 || v->msb == 64) continue;
+                if (std == VX_GM2 && v->msb != 121) continue;
+                snprintf(t, sizeof t, "%3d/%-3d %s", v->msb, v->lsb, vx_text(v->name));
+                add_var(v->msb, v->lsb, v->prog, t);
+            }
+        }
+        (void)first;
+        if (!nvarn) {
+            /* GM, or no lists: the GM sound */
+            int m = std == VX_GM2 ? 121 : 0;
+            snprintf(t, sizeof t, "%3d/0   %s", m, mx_gm_names[p]);
+            add_var(m, 0, p, t);
         }
     }
-    if (!n && p < 128 && (nvars = (struct Node *)calloc(1, sizeof(struct Node))) && (tvars = (char (*)[48])calloc(1, 48))) {
-        /* no voice lists: the GM sound */
-        snprintf(tvars[0], 48, "  0/0   %s", mx_gm_names[p]);
-        nvars[0].ln_Name = tvars[0];
-        AddTail(&lvars, &nvars[0]);
-    }
-    nvarn = n;
     GT_SetGadgetAttrs(g_vars, xw, NULL, GTLV_Labels, (ULONG)&lvars, TAG_DONE);
+}
+
+/* the row of the program list for the part's sound */
+static int prog_row(const uint8_t *v)
+{
+    int std = vx_std();
+    if (xpart == 9 && std != VX_XG) return 129;
+    if (std == VX_XG && (v[MX_MSB] >= 126 || v[MX_MSB] == 120 || (xpart == 9 && v[MX_MSB] == 0))) return 129;
+    if (std == VX_GM2 && v[MX_MSB] == 120) return 129;
+    if (std == VX_XG && v[MX_MSB] == 64) return 128;
+    return v[MX_PROG] & 127;
 }
 
 static void show(App *a)
@@ -116,8 +149,8 @@ static void show(App *a)
     snprintf(soundbuf, sizeof soundbuf, "%d/%d/%d  %s", v[MX_MSB], v[MX_LSB], v[MX_PROG] + 1, n);
     GT_SetGadgetAttrs(g_sound, xw, NULL, GTTX_Text, (ULONG)soundbuf, TAG_DONE);
     for (p = 0; p < XP_N; p++) GT_SetGadgetAttrs(g_sl[p], xw, NULL, GTSL_Level, (WORD)(a->mx.xp[xpart][p] - mx_xp[p].shown), TAG_DONE);
-    if (xprog != (v[MX_MSB] >= 126 ? 129 : v[MX_MSB] == 64 ? 128 : v[MX_PROG])) {
-        xprog = vx_gs() ? (xpart == 9 ? 129 : v[MX_PROG]) : v[MX_MSB] >= 126 || v[MX_MSB] == 120 ? 129 : v[MX_MSB] == 64 ? 128 : v[MX_PROG];
+    if (xprog != prog_row(v)) {
+        xprog = prog_row(v);
         GT_SetGadgetAttrs(g_progs, xw, NULL, GTLV_Selected, xprog, GTLV_MakeVisible, xprog, TAG_DONE);
         fill_vars(xprog);
     }
@@ -167,7 +200,9 @@ int xw_open(App *a)
     NewList(&lvars);
     ng.ng_TopEdge = y; ng.ng_Height = fh + 4; ng.ng_LeftEdge = x0; ng.ng_Width = 90; ng.ng_GadgetID = X_PART;
     g = g_part = CreateGadget(CYCLE_KIND, g, &ng, GTCY_Labels, (ULONG)PARTS, GTCY_Active, xpart, TAG_DONE);
-    ng.ng_LeftEdge = x0 + 96; ng.ng_Width = lw * 2 - 96 + 4; ng.ng_GadgetID = X_SOUND;
+    ng.ng_LeftEdge = x0 + 94; ng.ng_Width = 136; ng.ng_GadgetID = X_STD;
+    g = g_std = CreateGadget(CYCLE_KIND, g, &ng, GTCY_Labels, (ULONG)STDS, GTCY_Active, a->std_user + 1, TAG_DONE);
+    ng.ng_LeftEdge = x0 + 234; ng.ng_Width = lw * 2 - 234 + 4; ng.ng_GadgetID = X_SOUND;
     g = g_sound = CreateGadget(TEXT_KIND, g, &ng, GTTX_Text, (ULONG)"", GTTX_Border, TRUE, TAG_DONE);
     y += fh + 8;
     y += fh + 2;
@@ -214,8 +249,8 @@ void xw_close(void)
     xw = NULL;
     FreeGadgets(xgl); xgl = NULL;
     FreeVisualInfo(xvi); xvi = NULL;
-    free(nvars); free(tvars); free(vidx);
-    nvars = NULL; tvars = NULL; vidx = NULL;
+    free(nvars); free(tvars); free(vch);
+    nvars = NULL; tvars = NULL; vch = NULL;
 }
 
 void xw_refresh(App *a)
@@ -255,29 +290,28 @@ int xw_handle(App *a)
             xprog = -1;
             show(a);
             break;
+        case X_STD:
+            /* GM / GM2 / GS / XG: the names and the sounds offered */
+            a->std_user = (int)code - 1;
+            app_names_std(a);
+            GT_SetGadgetAttrs(g_progs, xw, NULL, GTLV_Labels, ~0UL, TAG_DONE);
+            fill_progs();
+            GT_SetGadgetAttrs(g_progs, xw, NULL, GTLV_Labels, (ULONG)&lprogs, TAG_DONE);
+            xprog = -1;
+            show(a);
+            changed = 1;
+            break;
         case X_PROGS:
             if (cls != IDCMP_GADGETUP) break;
             xprog = code;
             fill_vars(xprog);
-            /* a program alone: its main sound */
-            if (xprog < 128) { choose(a, 0, 0, xprog); changed = 1; show(a); }
+            /* a program alone: its main sound (the first of its banks) */
+            if (xprog < 128 && nvarn) { choose(a, vch[0].m, vch[0].l, vch[0].p); changed = 1; show(a); }
             break;
         case X_VARS:
             if (cls != IDCMP_GADGETUP) break;
-            if (code < nvarn && vidx[code] <= -1000) {
-                /* a GS kit: the program on the part (bank 0) */
-                choose(a, 0, 0, -1000 - vidx[code]);
-                changed = 1;
-                show(a);
-            } else if (code < nvarn && vidx[code] < 0) {
-                int gm, gl, gp;
-                const char *gn;
-                if (vx_gs_get(-1 - vidx[code], &gm, &gl, &gp, &gn)) choose(a, gm, gl, gp);
-                changed = 1;
-                show(a);
-            } else if (code < nvarn) {
-                const VxVoice *v = vx_get(vidx[code]);
-                choose(a, v->msb, v->msb >= 126 || v->msb == 64 ? 0 : v->lsb, v->prog);
+            if (code < nvarn) {
+                choose(a, vch[code].m, vch[code].l, vch[code].p);
                 changed = 1;
                 show(a);
             }

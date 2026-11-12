@@ -182,7 +182,13 @@ static int load_ws(const char *dir)
 /* ---- GS (SC-8850) from the user's midi-file-editor.html ---- */
 typedef struct { uint8_t msb, lsb, prog; uint32_t name; } GsVoice;
 static GsVoice *gsv;
-static int ngs, capgs, gs_on;
+static int ngs, capgs, vstd;
+#define gs_on (vstd == VX_GS)
+const char *const vx_std_names[VX_STDS + 1] = {"XG", "GM", "GM2", "GS (SC-8850)", NULL};
+/* the kits every GM2 / GS module has, by program (generic names) */
+static const struct { uint8_t prog; const char *name; } STD_KITS[] = {
+    {0, "Standard"}, {8, "Room"}, {16, "Power"}, {24, "Electronic"}, {25, "Analog"}, {32, "Jazz"}, {40, "Brush"}, {48, "Orchestra"}, {56, "SFX"},
+};
 static uint32_t gskit[128];
 static uint8_t gskit_has[128];
 
@@ -280,7 +286,47 @@ static void load_gs(const char *dir)
     free(b);
 }
 
-void vx_set_gs(int on) { gs_on = on; }
+void vx_set_gs(int on) { vstd = on ? VX_GS : VX_XG; }
+void vx_set_std(int std) { vstd = std >= 0 && std < VX_STDS ? std : VX_XG; }
+int vx_std(void) { return vstd; }
+
+int vx_kit(int std, int k, int *msb, int *prog, const char **name)
+{
+    int i, n = 0;
+    if (std == VX_GM) {
+        if (k) return 0;
+        *msb = 0; *prog = 0; *name = "Standard";
+        return 1;
+    }
+    if (std == VX_XG || std == VX_GM2) {
+        /* the kits of the lists (XG: MSB 127 / 126, GM2: 120) */
+        for (i = 0; i < nv; i++) {
+            int m = vv[i].msb;
+            if (std == VX_XG ? m >= 126 : m == 120) {
+                if (n++ == k) { *msb = m; *prog = vv[i].prog; *name = names + vv[i].name; return 1; }
+            }
+        }
+        if (n) return 0;
+    }
+    if (std == VX_GS)
+        for (i = 0; i < 128; i++)
+            if (gskit_has[i] && n++ == k) { *msb = 0; *prog = i; *name = names + gskit[i]; return 1; }
+    if (n) return 0;
+    /* no lists: the kits of the standard */
+    if (k < 0 || k >= (int)(sizeof STD_KITS / sizeof STD_KITS[0])) return 0;
+    *msb = std == VX_GM2 ? 120 : std == VX_XG ? 127 : 0;
+    *prog = STD_KITS[k].prog;
+    *name = std == VX_GS && STD_KITS[k].prog == 25 ? "TR-808" : STD_KITS[k].name;
+    return 1;
+}
+
+static const char *std_kit_name(int prog)
+{
+    int k;
+    for (k = (int)(sizeof STD_KITS / sizeof STD_KITS[0]) - 1; k >= 0; k--)
+        if (STD_KITS[k].prog <= prog) return STD_KITS[k].name;
+    return "Standard";
+}
 
 int vx_gs_get(int i, int *msb, int *lsb, int *prog, const char **name)
 {
@@ -310,9 +356,16 @@ const char *vx_sound(int ch, int msb, int lsb, int prog)
     const char *n;
     extern const char *const mx_gm_names[128];
     prog &= 127;
+    if (vstd == VX_GM) return (ch & 15) == 9 ? "Standard" : mx_gm_names[prog];
+    if (vstd == VX_GM2) {
+        /* GM2: melody bank MSB 121 (variations by LSB), kits MSB 120 */
+        if ((ch & 15) == 9 || msb == 120) { n = vx_name(120, 0, prog); return n ? n : std_kit_name(prog); }
+        n = vx_name(121, lsb, prog);
+        return n ? n : mx_gm_names[prog];
+    }
     if (gs_on) {
         /* GS: channel 10 plays the kit of the program */
-        if ((ch & 15) == 9) return gskit_has[prog] ? names + gskit[prog] : gskit_has[prog & 0x78] ? names + gskit[prog & 0x78] : "Drums";
+        if ((ch & 15) == 9) return gskit_has[prog] ? names + gskit[prog] : gskit_has[prog & 0x78] ? names + gskit[prog & 0x78] : std_kit_name(prog);
         n = gs_name(msb, lsb, prog);
         return n ? n : mx_gm_names[prog];
     }
@@ -321,7 +374,7 @@ const char *vx_sound(int ch, int msb, int lsb, int prog)
     n = vx_name(msb, lsb, prog);
     if (!n && msb >= 126) n = vx_name(msb, 0, prog);
     if (!n && msb == 127) n = vx_name(127, 0, 0);
-    if (!n) n = msb >= 126 || msb == 120 ? "Drums" : mx_gm_names[prog];
+    if (!n) n = msb >= 126 || msb == 120 ? std_kit_name(prog) : mx_gm_names[prog];
     return n;
 }
 
@@ -409,7 +462,12 @@ int vx_drum_kind(int key)
 const char *vx_drum_of(int ch, int msb, int prog, int key)
 {
     const char *n;
-    if (gs_on) return dr_gm_names[key & 127];
+    if (vstd == VX_GM || vstd == VX_GS) return dr_gm_names[key & 127];
+    if (vstd == VX_GM2) {
+        n = vx_drum(120, prog, key);
+        if (!n) n = vx_drum(120, 0, key);
+        return n ? n : dr_gm_names[key & 127];
+    }
     /* GM2 kits (MSB 120) have the names of the XG kits of the same number */
     if (msb == 120) msb = 127;
     /* channel 10 without a drum bank: the drum bank (XG) */

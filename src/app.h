@@ -36,6 +36,7 @@ typedef struct {
     int letters;           /* TM_ASCII, TM_LATIN2, TM_LATIN1 */
     int kfont;             /* karaoke text size */
     int screen;            /* the Screen setting (screen.h: 0 Workbench, 16 / 32 / 256 colours) */
+    int std_user;          /* the sound standard chosen in the XGM editor (VX_XG ...), -1 = by the song */
     int is_xws;            /* the loaded song is an .XWS (saved as .mid) */
     EdSong ed;             /* the song as it is edited */
     EdSong undo[UNDOS];    /* before the last edits (ring) */

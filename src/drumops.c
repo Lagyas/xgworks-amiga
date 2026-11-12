@@ -3,8 +3,12 @@
 #include "drumops.h"
 #include "rollops.h"
 
-/* General MIDI Level 1 percussion (MMA, public), keys 35-81. */
+/* General MIDI percussion (MMA, public): GM Level 1 keys 35-81, GM Level 2
+ * adds 27-34 and 82-87. */
 const char *const dr_gm_names[128] = {
+    [27] = "High Q", [28] = "Slap", [29] = "Scratch Push", [30] = "Scratch Pull", [31] = "Sticks",
+    [32] = "Square Click", [33] = "Metronome Click", [34] = "Metronome Bell",
+    [82] = "Shaker", [83] = "Jingle Bell", [84] = "Belltree", [85] = "Castanets", [86] = "Mute Surdo", [87] = "Open Surdo",
     [35] = "Acoustic Bass Drum", [36] = "Bass Drum 1", [37] = "Side Stick", [38] = "Acoustic Snare", [39] = "Hand Clap",
     [40] = "Electric Snare", [41] = "Low Floor Tom", [42] = "Closed Hi-Hat", [43] = "High Floor Tom", [44] = "Pedal Hi-Hat",
     [45] = "Low Tom", [46] = "Open Hi-Hat", [47] = "Low-Mid Tom", [48] = "Hi-Mid Tom", [49] = "Crash Cymbal 1",

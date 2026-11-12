@@ -25,6 +25,18 @@ int main(int argc, char **argv)
     for (p = 0; p < 128; p++) printf("s %d %s / %s\n", p, vx_sound(0, 0, 0, p), vx_sound(9, 0, 0, p));
     vx_set_gs(1);
     for (p = 0; p < 128; p++) printf("g %d %s / %s / %s\n", p, vx_sound(0, 0, 0, p), vx_sound(0, 8, 0, p), vx_sound(9, 0, 0, p));
+    {
+        /* the standards: names and kits */
+        int st, km, pr;
+        const char *kn;
+        for (st = 0; st < VX_STDS; st++) {
+            vx_set_std(st);
+            printf("std %s: %s / %s / %s / drum 27 %s\n", vx_std_names[st], vx_sound(0, 0, 0, 0), vx_sound(0, 121, 1, 0), vx_sound(9, 0, 0, 25),
+                   (s = vx_drum_of(9, 0, 0, 27)) ? s : "-");
+            for (k = 0; vx_kit(st, k, &km, &pr, &kn); k++) printf("  kit %d/%d %s\n", km, pr, kn);
+        }
+        vx_set_std(VX_XG);
+    }
     vx_free();
     {
         /* the formats the windows use (the C library of the Amiga) */

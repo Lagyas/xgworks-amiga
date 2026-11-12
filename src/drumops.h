@@ -5,7 +5,7 @@
 
 #include "edit.h"
 
-extern const char *const dr_gm_names[128];   /* GM drum names (35-81), the rest NULL */
+extern const char *const dr_gm_names[128];   /* GM / GM2 drum names (27-87), the rest NULL */
 
 /* Keys with hits in the track (channel ch, -1 all): used[k] = number of hits; returns how many keys. */
 int  dr_keys_used(const EdSong *s, uint32_t trk, int ch, uint32_t used[128]);

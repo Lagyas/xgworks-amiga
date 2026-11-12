@@ -97,6 +97,7 @@ int app_init(App *a, const char *folder)
     memset(a, 0, sizeof *a);
     a->cur = -1;
     a->locate_us = -1;
+    a->std_user = -1;
     a->autonext = 1;
     a->kfont = 24;
     strcpy(a->serdev, "serial.device");
@@ -105,7 +106,9 @@ int app_init(App *a, const char *folder)
     AslBase = OpenLibrary((CONST_STRPTR)"asl.library", 37);
     /* sound names from the XGworks voice lists next to the program (if they are there) */
     {
+        /* next to the program, else in the current folder */
         int nvx = vx_load("PROGDIR:XG4");
+        if (!nvx) nvx = vx_load("XG4");
         if (nvx) snprintf(a->info, sizeof a->info, "Sound names: %d sounds%s from XG4.", nvx, vx_gs_count() ? " and the SC-8850 (GS)" : "");
         else snprintf(a->info, sizeof a->info, "No voice lists in PROGDIR:XG4 - GM names (see XG4/ReadMe).");
     }
@@ -438,7 +441,8 @@ static int rebuild(App *a)
    choice GS, or with "Song's own" a song with GS messages; else XG / GM. */
 void app_names_std(App *a)
 {
-    vx_set_gs(a->reset == 3 || (a->reset == 0 && a->mx.fx.gs));
+    if (a->std_user >= 0) vx_set_std(a->std_user);
+    else vx_set_std(a->reset == 3 || (a->reset == 0 && a->mx.fx.gs) ? VX_GS : a->reset == 2 ? VX_GM : VX_XG);
 }
 
 int app_ed_commit(App *a)
