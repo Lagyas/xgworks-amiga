@@ -3,6 +3,7 @@
  *   vxdump <XG4 folder> */
 #include <stdio.h>
 #include "../src/voices.h"
+#include "../src/drumops.h"
 
 int main(int argc, char **argv)
 {
@@ -18,8 +19,11 @@ int main(int argc, char **argv)
             for (l = 0; l < 4; l++)
                 if ((s = vx_name(msbs[m], l, p))) printf("v %d/%d/%d %s\n", msbs[m], l, p, s);
     for (p = 0; p < 2; p++)
-        for (k = 0; k < 128; k++)
-            printf("d %d %d %s\n", p, k, (s = vx_drum_of(9, p ? 127 : 0, p * 25, k)) ? s : "-");
+        for (k = 0; k < 128; k++) {
+            char nm[48];
+            dr_clean(nm, sizeof nm, vx_drum_of(9, p ? 127 : 0, p * 25, k));
+            printf("d %d %d %s [%s]\n", p, k, (s = vx_drum_of(9, p ? 127 : 0, p * 25, k)) ? s : "-", nm);
+        }
     vx_drum_order(order);
     for (k = 0; k < 128; k++) printf("o %d %d %d\n", k, order[k], vx_drum_kind(order[k]));
     for (p = 0; p < 128; p++) printf("s %d %s / %s\n", p, vx_sound(0, 0, 0, p), vx_sound(9, 0, 0, p));
@@ -49,6 +53,7 @@ int main(int argc, char **argv)
         printf("f3 %s\n", b);
         sprintf(b, "%-13s|%.5s|%13s|", "ab", "abcdefgh", "cd");
         printf("f4 %s\n", b);
+        printf("f5 %d\n", sprintf(b, "%3d ", 36));
     }
     return 0;
 }

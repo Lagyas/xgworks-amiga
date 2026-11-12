@@ -21,6 +21,18 @@ const char *const dr_gm_names[128] = {
     [80] = "Mute Triangle", [81] = "Open Triangle",
 };
 
+int dr_clean(char *out, int max, const char *name)
+{
+    int o = 0;
+    if (!name) name = "************";
+    while (*name && o < max - 1) {
+        unsigned char c = (unsigned char)*name++;
+        out[o++] = (char)(c < 32 || (c >= 127 && c < 160) ? '?' : c);
+    }
+    out[o] = 0;
+    return o;
+}
+
 int dr_keys_used(const EdSong *s, uint32_t trk, int ch, uint32_t used[128])
 {
     uint32_t i;

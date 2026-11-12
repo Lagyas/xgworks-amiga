@@ -44,6 +44,7 @@ static WORD tb, nx0, gx0, gx1, gy0, gy1, rh;
 static UWORD pen_bg = 0, pen_tx = 1, pen_sh = 2, pen_fill = 3;
 static int play_key = -1;
 static struct TextFont *dmono;
+static int last_key = -1;          /* the drum clicked last (its name in the title) */
 
 static const char *const DGRIDS[] = {"1/4", "1/8", "1/16", "1/32", "1/8 T", "1/16 T", NULL};
 static const char *const DCHS[] = {"All", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", NULL};
@@ -192,18 +193,26 @@ static void draw(App *a)
         SetAPen(rp, pal(KIND_PEN[kind > 5 ? 1 : kind], pen_fill));
         RectFill(rp, (WORD)(nx0 + 2), (WORD)(y + 1), (WORD)(nx0 + 4), (WORD)(y + rh - 3));
         {
-            const char *dn = drum_name(a, key);
-            int j, o, maxc = (gx0 - nx0 - 12) / (rp->TxWidth ? rp->TxWidth : 8);
-            o = sprintf(txt, "%3d ", key);
-            /* only printable letters (a byte of another set: '?') */
-            for (j = 0; dn[j] && o < maxc && o < (int)sizeof txt - 1; j++)
-                txt[o++] = (char)((unsigned char)dn[j] < 32 || ((unsigned char)dn[j] >= 127 && (unsigned char)dn[j] < 160) ? '?' : dn[j]);
-            txt[o] = 0;
+            /* the key number, then the drum's name fitted into the button */
+            char nm[48], num[8];
+            WORD ty = (WORD)(y + (rh - rp->TxHeight) / 2 + rp->TxBaseline), nx;
+            LONG avail;
+            ULONG fit;
+            struct TextExtent te;
+            int len = dr_clean(nm, sizeof nm, drum_name(a, key));
+            num[0] = (char)('0' + key / 100); num[1] = (char)('0' + key / 10 % 10); num[2] = (char)('0' + key % 10); num[3] = 0;
+            if (key < 100) num[0] = ' ';
+            if (key < 10) num[1] = ' ';
+            SetAPen(rp, black);
+            SetDrMd(rp, JAM1);
+            Move(rp, (WORD)(nx0 + 7), ty);
+            Text(rp, (CONST_STRPTR)num, 3);
+            nx = (WORD)(nx0 + 7 + TextLength(rp, (CONST_STRPTR)"000 ", 4));
+            avail = (LONG)(gx0 - 4 - nx);
+            fit = avail > 0 && len ? TextFit(rp, (CONST_STRPTR)nm, (ULONG)len, &te, NULL, 1, (UWORD)avail, (UWORD)(rp->TxHeight + 1)) : 0;
+            Move(rp, nx, ty);
+            if (fit) Text(rp, (CONST_STRPTR)nm, fit);
         }
-        SetAPen(rp, black);
-        SetDrMd(rp, JAM1);
-        Move(rp, (WORD)(nx0 + 7), (WORD)(y + (rh - rp->TxHeight) / 2 + rp->TxBaseline));
-        Text(rp, (CONST_STRPTR)txt, strlen(txt));
         /* the row line */
         SetAPen(rp, line);
         Move(rp, gx0, (WORD)(y + rh - 1)); Draw(rp, gx1, (WORD)(y + rh - 1));
@@ -244,7 +253,7 @@ static void draw(App *a)
 
 static void title(App *a)
 {
-    static char t[100];
+    static char t[180];
     uint32_t len;
     const uint8_t *nm = ed_name(&a->ed, (uint32_t)dtrk, &len);
     char n[44] = "";
@@ -256,6 +265,11 @@ static void title(App *a)
         else snprintf(cnt, sizeof cnt, "no XG4 lists: GM2 names");
         snprintf(t, sizeof t, "Drums - %d %s - ch %d %s (%s)", dtrk + 1, n, kc + 1,
                  vx_sound(kc, a->mx.val[kc][MX_MSB], a->mx.val[kc][MX_LSB], a->mx.val[kc][MX_PROG]), cnt);
+        if (last_key >= 0) {
+            char nm[40];
+            dr_clean(nm, sizeof nm, drum_name(a, last_key));
+            snprintf(t + strlen(t), sizeof t - strlen(t), " - key %d: %s", last_key, nm);
+        }
     }
     SetWindowTitles(dw, (CONST_STRPTR)t, (CONST_STRPTR)~0);
 }
@@ -442,6 +456,8 @@ int dw_handle(App *a)
                     /* the name: hear the drum */
                     play_key = keys[r];
                     app_note(a, kit_channel(a), play_key, dvel);
+                    last_key = play_key;
+                    title(a);
                 } else if (mx >= gx0 && mx <= gx1) {
                     uint32_t st = step_ticks(a), t = (htop - htop % st) + (uint32_t)((mx - gx0) / (WORD)spx) * st;
                     int res;

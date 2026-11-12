@@ -9,6 +9,9 @@ extern const char *const dr_gm_names[128];   /* GM / GM2 drum names (27-87), the
 
 /* Keys with hits in the track (channel ch, -1 all): used[k] = number of hits; returns how many keys. */
 int  dr_keys_used(const EdSong *s, uint32_t trk, int ch, uint32_t used[128]);
+/* A drum's name for the screen: printable letters only (others '?'), at most
+ * max - 1 of them; NULL = "************". Returns the length. */
+int  dr_clean(char *out, int max, const char *name);
 /* The hit of `key` in [t0, t1), -1 = none. */
 long dr_hit(const EdSong *s, uint32_t trk, int ch, int key, uint32_t t0, uint32_t t1);
 /* Toggle the hit in the step [t, t + step): removes it, else adds a note
