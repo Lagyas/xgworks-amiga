@@ -36,6 +36,7 @@
 #include "textmap.h"
 #include "edwin.h"
 #include "rollops.h"
+#include "screen.h"
 
 struct Library *DiskfontBase;
 extern struct Library *GadToolsBase, *AslBase;
@@ -291,7 +292,7 @@ int kw_open(App *a)
     struct DrawInfo *dri;
     WORD fh, x0, y, W, H, bh, rx;
     if (kw) { WindowToFront(kw); ActivateWindow(kw); kw_update(a, a->pos_us, 1); return 1; }
-    if (!(kscr = LockPubScreen(NULL))) return 0;
+    if (!(kscr = LockPubScreen((CONST_STRPTR)scr_pubname()))) return 0;
     if ((dri = GetScreenDrawInfo(kscr))) {
         p_bg = dri->dri_Pens[BACKGROUNDPEN]; p_tx = dri->dri_Pens[SHADOWPEN];
         p_sh = dri->dri_Pens[SHINEPEN]; p_fill = dri->dri_Pens[FILLPEN];

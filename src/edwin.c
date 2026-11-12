@@ -18,6 +18,7 @@
 #include "edwin.h"
 #include "edtext.h"
 #include "textmap.h"
+#include "screen.h"
 
 extern struct Library *GadToolsBase;
 
@@ -100,7 +101,7 @@ int edw_tracks_open(App *a)
     WORD fh, top, x0, y, w = 420;
     if (tw) { WindowToFront(tw); ActivateWindow(tw); return 1; }
     if (a->cur < 0) { snprintf(a->info, sizeof a->info, "Load a song first."); return 0; }
-    if (!(scr = LockPubScreen(NULL))) return 0;
+    if (!(scr = LockPubScreen((CONST_STRPTR)scr_pubname()))) return 0;
     tvi = GetVisualInfo(scr, TAG_DONE);
     fh = scr->Font->ta_YSize;
     top = scr->WBorTop + fh + 1 + 4;
@@ -285,7 +286,7 @@ static int ev_open(App *a, int trk)
     if (ew) { WindowToFront(ew); ActivateWindow(ew); etop = 0; esel = -1; ev_title(a); ev_select(a, 0, 1); return 1; }
     ta.ta_Name = (STRPTR)"topaz.font"; ta.ta_YSize = 8; ta.ta_Style = 0; ta.ta_Flags = 0;
     if (!mono) mono = OpenFont(&ta);
-    if (!(scr = LockPubScreen(NULL))) return 0;
+    if (!(scr = LockPubScreen((CONST_STRPTR)scr_pubname()))) return 0;
     evi = GetVisualInfo(scr, TAG_DONE);
     fh = scr->Font->ta_YSize;
     rh = mono ? mono->tf_YSize : fh;

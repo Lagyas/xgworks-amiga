@@ -25,6 +25,7 @@
 #include "pianoroll.h"
 #include "rollops.h"
 #include "edwin.h"
+#include "screen.h"
 
 extern struct Library *GadToolsBase;
 
@@ -275,7 +276,7 @@ int pr_open(App *a)
     if (a->cur < 0) { snprintf(a->info, sizeof a->info, "Load a song first."); return 0; }
     rtrk = default_track(a);
     if (rw) { WindowToFront(rw); ActivateWindow(rw); draw(a); title(a); return 1; }
-    if (!(scr = LockPubScreen(NULL))) return 0;
+    if (!(scr = LockPubScreen((CONST_STRPTR)scr_pubname()))) return 0;
     if ((dri = GetScreenDrawInfo(scr))) {
         pen_bg = dri->dri_Pens[BACKGROUNDPEN]; pen_tx = dri->dri_Pens[SHADOWPEN];
         pen_sh = dri->dri_Pens[SHINEPEN]; pen_fill = dri->dri_Pens[FILLPEN];

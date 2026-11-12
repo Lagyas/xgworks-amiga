@@ -35,6 +35,7 @@
 #include "jobs.h"
 #include "voices.h"
 #include "mixer.h"
+#include "screen.h"
 #include <libraries/gadtools.h>
 
 extern struct Library *GadToolsBase;
@@ -325,7 +326,7 @@ int tv_open(App *a)
     WORD fh, x, y;
     if (a->cur < 0) { snprintf(a->info, sizeof a->info, "Load a song first."); return 0; }
     if (vw) { WindowToFront(vw); ActivateWindow(vw); draw(a); return 1; }
-    if (!(scr = LockPubScreen(NULL))) return 0;
+    if (!(scr = LockPubScreen((CONST_STRPTR)scr_pubname()))) return 0;
     if ((dri = GetScreenDrawInfo(scr))) {
         pen_bg = dri->dri_Pens[BACKGROUNDPEN]; pen_tx = dri->dri_Pens[SHADOWPEN];
         pen_sh = dri->dri_Pens[SHINEPEN]; pen_fill = dri->dri_Pens[FILLPEN];
@@ -554,7 +555,7 @@ static void demix_open(App *a, int by_note)
     WORD fh, x0, y;
     int c, ch;
     if (dmw) { WindowToFront(dmw); return; }
-    if (!(scr = LockPubScreen(NULL))) return;
+    if (!(scr = LockPubScreen((CONST_STRPTR)scr_pubname()))) return;
     dm_by_note = by_note;
     dm_app = a;
     dmvi = GetVisualInfo(scr, TAG_DONE);

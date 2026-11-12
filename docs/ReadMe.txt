@@ -21,6 +21,9 @@ XGWorksLite - the window
   Transpose  -12 .. +12 half-tones, every channel but the drums (10)
   Reset      Song's own / XG / GM / GS: a System On before the song
   Output     serial.device (31250 baud) or CAMD (camd.library, link out.0)
+  Screen     Workbench / 16 / 32 / 256 colours: from the next start an own
+             screen like the Workbench with these colours (as far as the
+             display can: ECS 16, AGA / RTG 256), all the windows on it.
 
   Mixer...   the 16 parts of the song: sound (program, bank MSB / LSB),
              volume, pan, reverb, chorus, mute (M), solo (S). The values are

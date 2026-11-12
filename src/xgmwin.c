@@ -17,6 +17,7 @@
 #include <string.h>
 #include "xgmwin.h"
 #include "voices.h"
+#include "screen.h"
 
 extern struct Library *GadToolsBase;
 
@@ -110,7 +111,7 @@ int xw_open(App *a)
     WORD fh, x0, y, lw = 230, lh;
     int p;
     if (xw) { WindowToFront(xw); ActivateWindow(xw); show(a); return 1; }
-    if (!(scr = LockPubScreen(NULL))) return 0;
+    if (!(scr = LockPubScreen((CONST_STRPTR)scr_pubname()))) return 0;
     xvi = GetVisualInfo(scr, TAG_DONE);
     fh = scr->Font->ta_YSize;
     x0 = (WORD)(scr->WBorLeft + 6);

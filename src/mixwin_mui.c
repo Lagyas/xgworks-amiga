@@ -10,6 +10,7 @@
 #include <string.h>
 #include "mixwin.h"
 #include "voices.h"
+#include "screen.h"
 
 #ifndef MAKE_ID
 #define MAKE_ID(a, b, c, d) ((ULONG)(a) << 24 | (ULONG)(b) << 16 | (ULONG)(c) << 8 | (ULONG)(d))
@@ -66,6 +67,7 @@ void *mixmui_create(App *a, void *mui_app)
         for (k = 0; k < C_N; k++) DoMethod(grid, OM_ADDMEMBER, (ULONG)ctl[c][k]);
     }
     mwin = WindowObject,
+        scr_pubname() ? MUIA_Window_PublicScreen : TAG_IGNORE, (ULONG)scr_pubname(),
         MUIA_Window_Title, (ULONG)"XGWorks Lite - Mixer",
         MUIA_Window_ID, MAKE_ID('X', 'G', 'M', 'X'),
         MUIA_HelpNode, (ULONG)"Mixer",

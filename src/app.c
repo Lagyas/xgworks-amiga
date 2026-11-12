@@ -750,6 +750,7 @@ void app_load_prefs(App *a)
         else if (!strcmp(line, "tempo")) app_set_tempo(a, atoi(v));
         else if (!strcmp(line, "letters")) a->letters = atoi(v) % 3;
         else if (!strcmp(line, "lyricsize")) a->kfont = atoi(v) < 8 ? 24 : atoi(v);
+        else if (!strcmp(line, "screen")) a->screen = atoi(v) & 3;
     }
     fclose(f);
 }
@@ -761,7 +762,7 @@ void app_save_prefs(const App *a)
     for (k = 0; k < 2; k++) {
         FILE *f = fopen(files[k], "w");
         if (!f) continue;
-        fprintf(f, "folder=%s\nreset=%d\noutput=%d\ndevice=%s\nunit=%ld\ntempo=%d\nletters=%d\nlyricsize=%d\n", a->folder, a->reset, a->output, a->serdev, a->unit, a->pl.tempo, a->letters, a->kfont);
+        fprintf(f, "folder=%s\nreset=%d\noutput=%d\ndevice=%s\nunit=%ld\ntempo=%d\nletters=%d\nlyricsize=%d\nscreen=%d\n", a->folder, a->reset, a->output, a->serdev, a->unit, a->pl.tempo, a->letters, a->kfont, a->screen);
         fclose(f);
     }
 }

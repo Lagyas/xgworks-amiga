@@ -17,6 +17,7 @@
 #include <string.h>
 #include "lyredwin.h"
 #include "lyrtools.h"
+#include "screen.h"
 
 extern struct Library *GadToolsBase;
 
@@ -82,7 +83,7 @@ int yw_open(App *a)
     WORD fh, x0, y, w = 580, lh;
     if (a->cur < 0) { snprintf(a->info, sizeof a->info, "Load a song first."); return 0; }
     if (yw) { WindowToFront(yw); ActivateWindow(yw); fill(a); return 1; }
-    if (!(scr = LockPubScreen(NULL))) return 0;
+    if (!(scr = LockPubScreen((CONST_STRPTR)scr_pubname()))) return 0;
     yvi = GetVisualInfo(scr, TAG_DONE);
     fh = scr->Font->ta_YSize;
     x0 = (WORD)(scr->WBorLeft + 6);

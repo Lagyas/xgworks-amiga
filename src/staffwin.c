@@ -21,6 +21,7 @@
 #include "staffwin.h"
 #include "rollops.h"
 #include "edwin.h"
+#include "screen.h"
 
 extern struct Library *GadToolsBase;
 
@@ -232,7 +233,7 @@ int sw_open(App *a)
                 if (ro_is_note(&a->ed.trk[t].ev[i], -1) && (a->ed.trk[t].ev[i].st & 0x0F) != 9) { strk = (int)t; break; }
     }
     if (sw) { WindowToFront(sw); ActivateWindow(sw); draw(a); title(a); return 1; }
-    if (!(scr = LockPubScreen(NULL))) return 0;
+    if (!(scr = LockPubScreen((CONST_STRPTR)scr_pubname()))) return 0;
     if ((dri = GetScreenDrawInfo(scr))) {
         pen_bg = dri->dri_Pens[SHINEPEN]; pen_tx = dri->dri_Pens[SHADOWPEN];
         FreeScreenDrawInfo(scr, dri);

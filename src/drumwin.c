@@ -22,6 +22,7 @@
 #include "rollops.h"
 #include "edwin.h"
 #include "voices.h"
+#include "screen.h"
 
 extern struct Library *GadToolsBase;
 
@@ -217,7 +218,7 @@ int dw_open(App *a)
     for (i = 0; i < a->ed.trk[dtrk].n; i++)
         if (ro_is_note(&a->ed.trk[dtrk].ev[i], 9)) { dch = 9; break; }
     if (dw) { WindowToFront(dw); ActivateWindow(dw); draw(a); title(a); return 1; }
-    if (!(scr = LockPubScreen(NULL))) return 0;
+    if (!(scr = LockPubScreen((CONST_STRPTR)scr_pubname()))) return 0;
     if ((dri = GetScreenDrawInfo(scr))) {
         pen_bg = dri->dri_Pens[BACKGROUNDPEN]; pen_tx = dri->dri_Pens[SHADOWPEN];
         pen_sh = dri->dri_Pens[SHINEPEN]; pen_fill = dri->dri_Pens[FILLPEN];

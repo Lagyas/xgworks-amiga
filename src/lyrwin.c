@@ -22,6 +22,7 @@
 #include "rollops.h"
 #include "edwin.h"
 #include "textmap.h"
+#include "screen.h"
 
 extern struct Library *GadToolsBase, *AslBase;
 
@@ -73,7 +74,7 @@ int lw_open(App *a)
     WORD fh, x0, y, w = 560, bh;
     if (a->cur < 0) { snprintf(a->info, sizeof a->info, "Load a song first."); return 0; }
     if (lw) { WindowToFront(lw); ActivateWindow(lw); title(a); return 1; }
-    if (!(scr = LockPubScreen(NULL))) return 0;
+    if (!(scr = LockPubScreen((CONST_STRPTR)scr_pubname()))) return 0;
     lvi = GetVisualInfo(scr, TAG_DONE);
     fh = scr->Font->ta_YSize;
     bh = fh + 6;

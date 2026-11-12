@@ -29,10 +29,11 @@
 #include "staffwin.h"
 #include "jobwin.h"
 #include "trackview.h"
+#include "screen.h"
 
 struct Library *GadToolsBase;
 
-enum { G_LIST, G_PREV, G_PLAY, G_STOP, G_NEXT, G_MIX, G_LYR, G_TRK, G_ROLL, G_DRUMS, G_TEXTS, G_XGM, G_LYRED, G_STAFF, G_JOBS, G_TV, G_NEW, G_CLOSE, G_SAVEAS, G_OPEN, G_FOLDER, G_POS, G_TIME, G_TEMPO, G_TRANS, G_RESET, G_OUT, G_INFO, G_COUNT };
+enum { G_LIST, G_PREV, G_PLAY, G_STOP, G_NEXT, G_MIX, G_LYR, G_TRK, G_ROLL, G_DRUMS, G_TEXTS, G_XGM, G_LYRED, G_STAFF, G_JOBS, G_TV, G_NEW, G_CLOSE, G_SAVEAS, G_OPEN, G_FOLDER, G_POS, G_TIME, G_TEMPO, G_TRANS, G_RESET, G_OUT, G_SCREEN, G_INFO, G_COUNT };
 
 static struct Gadget *gad[G_COUNT];
 static struct Window *win;
@@ -108,7 +109,7 @@ int gui_gadtools(App *a)
     int running = 1, sel = -1;
     ULONG secs0 = 0, mics0 = 0;
     if (!(GadToolsBase = OpenLibrary((CONST_STRPTR)"gadtools.library", 39))) return -1;
-    if (!(scr = LockPubScreen(NULL))) { CloseLibrary(GadToolsBase); return -1; }
+    if (!(scr = LockPubScreen((CONST_STRPTR)scr_pubname()))) { CloseLibrary(GadToolsBase); return -1; }
     vi = GetVisualInfo(scr, TAG_DONE);
     fh = scr->Font->ta_YSize;
     top = scr->WBorTop + fh + 1 + 4;
@@ -167,6 +168,9 @@ int gui_gadtools(App *a)
     g = gad[G_RESET] = CreateGadget(CYCLE_KIND, g, &ng, GTCY_Labels, (ULONG)app_reset_names, GTCY_Active, a->reset, TAG_DONE);
     ng.ng_LeftEdge = x0 + w - 150; ng.ng_Width = 150; ng.ng_GadgetText = (UBYTE *)"Output"; ng.ng_GadgetID = G_OUT;
     g = gad[G_OUT] = CreateGadget(CYCLE_KIND, g, &ng, GTCY_Labels, (ULONG)app_output_names, GTCY_Active, a->output, TAG_DONE);
+    y += bh + 4;
+    ng.ng_LeftEdge = x0 + 90; ng.ng_TopEdge = y; ng.ng_Width = 130; ng.ng_GadgetText = (UBYTE *)"Screen"; ng.ng_GadgetID = G_SCREEN;
+    g = gad[G_SCREEN] = CreateGadget(CYCLE_KIND, g, &ng, GTCY_Labels, (ULONG)scr_names, GTCY_Active, a->screen, TAG_DONE);
     y += bh + 6;
     ng.ng_LeftEdge = x0; ng.ng_TopEdge = y; ng.ng_Width = w; ng.ng_Height = fh + 4; ng.ng_GadgetText = NULL; ng.ng_GadgetID = G_INFO;
     g = gad[G_INFO] = CreateGadget(TEXT_KIND, g, &ng, GTTX_Text, (ULONG)a->info, GTTX_Border, TRUE, TAG_DONE);
@@ -365,6 +369,12 @@ int gui_gadtools(App *a)
                     break;
                 case G_OUT:
                     a->output = code;
+                    break;
+                case G_SCREEN:
+                    a->screen = code;
+                    app_save_prefs(a);
+                    snprintf(a->info, sizeof a->info, "%s", code ? "Screen: on the next start XGWorks Lite opens its own screen with these colours." : "Screen: on the next start on the Workbench.");
+                    show(a);
                     break;
                 }
                 break;

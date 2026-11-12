@@ -17,6 +17,7 @@
 #include "jobs.h"
 #include "edwin.h"
 #include "voices.h"
+#include "screen.h"
 
 extern struct Library *GadToolsBase;
 
@@ -192,7 +193,7 @@ int jw_open(App *a)
     if (a->cur < 0) { snprintf(a->info, sizeof a->info, "Load a song first."); return 0; }
     trk = edw_selected_track() >= 0 ? edw_selected_track() + 1 : 0;
     if (jw) { WindowToFront(jw); ActivateWindow(jw); rebuild(); return 1; }
-    if (!(scr = LockPubScreen(NULL))) return 0;
+    if (!(scr = LockPubScreen((CONST_STRPTR)scr_pubname()))) return 0;
     jvi = GetVisualInfo(scr, TAG_DONE);
     jfont = scr->Font;
     jfh = scr->Font->ta_YSize;

@@ -15,6 +15,7 @@
 #include <string.h>
 #include "mixwin.h"
 #include "voices.h"
+#include "screen.h"
 
 extern struct Library *GadToolsBase;
 
@@ -83,7 +84,7 @@ int mixgt_open(App *a)
     static const char *const heads[] = {"Part", "Sound", "Prog", "MSB", "LSB", "Volume", "Pan", "Reverb", "Chorus", "M", "S"};
     static const WORD hx[] = {0, 24, 132, 168, 204, 240, 316, 392, 468, 544, 570};
     if (mw) { WindowToFront(mw); ActivateWindow(mw); return 1; }
-    if (!(scr = LockPubScreen(NULL))) return 0;
+    if (!(scr = LockPubScreen((CONST_STRPTR)scr_pubname()))) return 0;
     vi = GetVisualInfo(scr, TAG_DONE);
     fh = scr->Font->ta_YSize;
     top = scr->WBorTop + fh + 1 + 4;

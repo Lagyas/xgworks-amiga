@@ -87,6 +87,13 @@ previous / next song. At the end of a song the next one starts.
   @{b}Transpose@{ub}   -12 .. +12 half-tones, all channels but the drums (10)
   @{b}Reset@{ub}       Song's own / XG / GM / GS: a System On before the song
   @{b}Output@{ub}      serial.device or CAMD, see @{"MIDI output" link Output}
+  @{b}Screen@{ub}      Workbench / 16 / 32 / 256 colours: from the next start
+              XGWorks Lite opens its own screen like the Workbench (the
+              same mode and size) with these colours, as far as the display
+              can show them (ECS: 16, AGA / RTG: 256), and all its windows
+              open there - the Track View then has the colours of the PC
+              version. The screen's front / back gadget leads to the
+              Workbench. Workbench: the windows on the Workbench as before.
 
 Keys in the classic window: P or Space play, S stop, Help this guide, Esc quit.
 @endnode

@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "gui.h"
+#include "screen.h"
 
 struct IntuitionBase *IntuitionBase;
 struct GfxBase *GfxBase;
@@ -69,8 +70,11 @@ int main(int argc, char **argv)
         printf("XGWorks Lite: no free signal.\n");
         r = 20;
     } else {
+        /* the Screen setting: an own screen with more colours */
+        scr_open(app.screen);
         r = classic ? -1 : gui_mui(&app);
         if (r < 0) r = gui_gadtools(&app);
+        scr_close();
         if (r < 0) printf("XGWorks Lite: the window cannot open.\n");
         app_save_prefs(&app);
         app_free(&app);

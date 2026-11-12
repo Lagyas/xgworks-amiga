@@ -21,6 +21,7 @@
 #include "staffwin.h"
 #include "jobwin.h"
 #include "trackview.h"
+#include "screen.h"
 
 struct Library *MUIMasterBase;
 
@@ -28,7 +29,7 @@ struct Library *MUIMasterBase;
 #define MAKE_ID(a, b, c, d) ((ULONG)(a) << 24 | (ULONG)(b) << 16 | (ULONG)(c) << 8 | (ULONG)(d))
 #endif
 
-enum { ID_PLAY = 1, ID_STOP, ID_PREV, ID_NEXT, ID_OPEN, ID_FOLDER, ID_LIST, ID_POS, ID_TEMPO, ID_TRANS, ID_RESET, ID_OUT, ID_MIX, ID_LYR, ID_TRK, ID_ROLL, ID_DRUMS, ID_TEXTS, ID_XGM, ID_LYRED, ID_STAFF, ID_JOBS, ID_TV, ID_NEW, ID_CLOSE, ID_SAVEAS };
+enum { ID_PLAY = 1, ID_STOP, ID_PREV, ID_NEXT, ID_OPEN, ID_FOLDER, ID_LIST, ID_POS, ID_TEMPO, ID_TRANS, ID_RESET, ID_OUT, ID_MIX, ID_LYR, ID_TRK, ID_ROLL, ID_DRUMS, ID_TEXTS, ID_XGM, ID_LYRED, ID_STAFF, ID_JOBS, ID_TV, ID_NEW, ID_CLOSE, ID_SAVEAS, ID_SCREEN };
 
 static Object *app, *win, *list, *spos, *ttime, *stempo, *strans, *creset, *cout, *tinfo, *lv;
 static Object *bprev, *bplay, *bstop, *bnext, *bopen, *bdir, *bmix, *blyr, *btrk, *broll, *bdrum, *btext, *bxgm, *blyred, *bstaff, *bjobs, *btv, *bnew, *bclose, *bsaveas;
@@ -66,6 +67,8 @@ static void show(App *a)
 }
 
 /* Load song k (when not loaded yet) and start it at `from`. */
+static Object *cscreen;
+
 static void start(App *a, int k, uint32_t from)
 {
     if (k < 0) return;
@@ -96,6 +99,7 @@ int gui_mui(App *a)
         MUIA_Application_Base, (ULONG)"XGWORKSLITE",
         MUIA_Application_HelpFile, (ULONG)"PROGDIR:XGWorksLite.guide",
         SubWindow, win = WindowObject,
+            scr_pubname() ? MUIA_Window_PublicScreen : TAG_IGNORE, (ULONG)scr_pubname(),
             MUIA_Window_Title, (ULONG)"XGWorks Lite",
             MUIA_Window_ID, MAKE_ID('X', 'G', 'W', 'L'),
             MUIA_HelpNode, (ULONG)"Main_Window",
@@ -150,6 +154,8 @@ int gui_mui(App *a)
                         Child, Label("Output"),
                         Child, cout = CycleObject, MUIA_Cycle_Entries, (ULONG)app_output_names, MUIA_Cycle_Active, a->output, End,
                     End,
+                    Child, Label("Screen"),
+                    Child, cscreen = CycleObject, MUIA_Cycle_Entries, (ULONG)scr_names, MUIA_Cycle_Active, a->screen, End,
                 End,
                 Child, tinfo = TextObject, TextFrame, MUIA_Background, MUII_TextBack, MUIA_Text_Contents, (ULONG)"", End,
             End,
@@ -176,6 +182,7 @@ int gui_mui(App *a)
     DoMethod(strans, MUIM_Notify, MUIA_Numeric_Value, MUIV_EveryTime, (ULONG)app, 2, MUIM_Application_ReturnID, ID_TRANS);
     DoMethod(creset, MUIM_Notify, MUIA_Cycle_Active, MUIV_EveryTime, (ULONG)app, 2, MUIM_Application_ReturnID, ID_RESET);
     DoMethod(cout, MUIM_Notify, MUIA_Cycle_Active, MUIV_EveryTime, (ULONG)app, 2, MUIM_Application_ReturnID, ID_OUT);
+    DoMethod(cscreen, MUIM_Notify, MUIA_Cycle_Active, MUIV_EveryTime, (ULONG)app, 2, MUIM_Application_ReturnID, ID_SCREEN);
     fill_list(a);
     SetAttrs(win, MUIA_Window_Open, TRUE, TAG_DONE);
     show(a);
@@ -232,6 +239,12 @@ int gui_mui(App *a)
             break;
         case ID_OUT:
             a->output = (int)getv(cout, MUIA_Cycle_Active);
+            break;
+        case ID_SCREEN:
+            a->screen = (int)getv(cscreen, MUIA_Cycle_Active);
+            app_save_prefs(a);
+            snprintf(a->info, sizeof a->info, "%s", a->screen ? "Screen: on the next start XGWorks Lite opens its own screen with these colours." : "Screen: on the next start on the Workbench.");
+            show(a);
             break;
         case ID_MIX:
             mixmui_refresh(a);
