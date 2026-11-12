@@ -48,9 +48,9 @@ static void fill_progs(void)
     NewList(&lprogs);
     for (p = 0; p < 130; p++) {
         if (p < 128) {
-            const char *n = vx_name(0, 0, p);
+            const char *n = vx_gs() ? vx_sound(0, 0, 0, p) : vx_name(0, 0, p);
             snprintf(tprogs[p], sizeof tprogs[p], "%3d %s", p + 1, n ? n : mx_gm_names[p]);
-        } else snprintf(tprogs[p], sizeof tprogs[p], "%s", p == 128 ? "--- SFX ---" : "--- Drum kits ---");
+        } else snprintf(tprogs[p], sizeof tprogs[p], "%s", p == 128 ? (vx_gs() ? "--- (GS: no SFX bank) ---" : "--- SFX ---") : "--- Drum kits ---");
         nprogs[p].ln_Name = tprogs[p];
         AddTail(&lprogs, &nprogs[p]);
     }
@@ -64,9 +64,29 @@ static void fill_vars(int p)
     free(nvars); free(tvars); free(vidx);
     nvars = NULL; tvars = NULL; vidx = NULL; nvarn = 0;
     NewList(&lvars);
+    if (vx_gs() && cnt < vx_gs_count() + 128) cnt = vx_gs_count() + 128;
     if (cnt && (nvars = (struct Node *)calloc((size_t)cnt + 1, sizeof(struct Node))) && (tvars = (char (*)[48])calloc((size_t)cnt + 1, 48)) &&
         (vidx = (int *)calloc((size_t)cnt + 1, sizeof(int)))) {
-        for (i = 0; i < cnt; i++) {
+        if (vx_gs()) {
+            /* GS (SC-8850): the variations (MSB) of the program, or the kits */
+            int gm, gl, gp, j;
+            const char *gn;
+            for (j = 0; p < 128 && n < cnt && vx_gs_get(j, &gm, &gl, &gp, &gn); j++)
+                if (gp == p) {
+                    snprintf(tvars[n], 48, "%3d/%-3d %s", gm, gl, gn);
+                    nvars[n].ln_Name = tvars[n];
+                    AddTail(&lvars, &nvars[n]);
+                    vidx[n++] = -1 - j;
+                }
+            for (j = 0; p == 129 && j < 128 && n < cnt; j++)
+                if ((gn = vx_gs_kit(j))) {
+                    snprintf(tvars[n], 48, "%3d %s", j + 1, gn);
+                    nvars[n].ln_Name = tvars[n];
+                    AddTail(&lvars, &nvars[n]);
+                    vidx[n++] = -1000 - j;
+                }
+        }
+        for (i = 0; i < cnt && !vx_gs(); i++) {
             const VxVoice *v = vx_get(i);
             int kit = v->msb >= 126 || v->msb == 120;   /* XG, SFX and GM2 kits */
             int ok = p < 128 ? (v->prog == p && !kit) : p == 128 ? v->msb == 64 : kit;
@@ -97,10 +117,21 @@ static void show(App *a)
     GT_SetGadgetAttrs(g_sound, xw, NULL, GTTX_Text, (ULONG)soundbuf, TAG_DONE);
     for (p = 0; p < XP_N; p++) GT_SetGadgetAttrs(g_sl[p], xw, NULL, GTSL_Level, (WORD)(a->mx.xp[xpart][p] - mx_xp[p].shown), TAG_DONE);
     if (xprog != (v[MX_MSB] >= 126 ? 129 : v[MX_MSB] == 64 ? 128 : v[MX_PROG])) {
-        xprog = v[MX_MSB] >= 126 ? 129 : v[MX_MSB] == 64 ? 128 : v[MX_PROG];
+        xprog = vx_gs() ? (xpart == 9 ? 129 : v[MX_PROG]) : v[MX_MSB] >= 126 || v[MX_MSB] == 120 ? 129 : v[MX_MSB] == 64 ? 128 : v[MX_PROG];
         GT_SetGadgetAttrs(g_progs, xw, NULL, GTLV_Selected, xprog, GTLV_MakeVisible, xprog, TAG_DONE);
         fill_vars(xprog);
     }
+}
+
+int xw_open_part(App *a, int part)
+{
+    if (part < 0 || part > 15) return xw_open(a);
+    xpart = part;
+    if (xw) {
+        GT_SetGadgetAttrs(g_part, xw, NULL, GTCY_Active, xpart, TAG_DONE);
+        xprog = -1;
+    }
+    return xw_open(a);
 }
 
 int xw_open(App *a)
@@ -128,10 +159,14 @@ int xw_open(App *a)
     ng.ng_LeftEdge = x0 + 96; ng.ng_Width = lw * 2 - 96 + 4; ng.ng_GadgetID = X_SOUND;
     g = g_sound = CreateGadget(TEXT_KIND, g, &ng, GTTX_Text, (ULONG)"", GTTX_Border, TRUE, TAG_DONE);
     y += fh + 8;
+    y += fh + 2;
     ng.ng_TopEdge = y; ng.ng_LeftEdge = x0; ng.ng_Width = lw; ng.ng_Height = lh; ng.ng_GadgetID = X_PROGS;
+    ng.ng_GadgetText = (UBYTE *)"1. Program"; ng.ng_Flags = PLACETEXT_ABOVE;
     g = g_progs = CreateGadget(LISTVIEW_KIND, g, &ng, GTLV_Labels, (ULONG)&lprogs, GTLV_ShowSelected, 0, TAG_DONE);
     ng.ng_LeftEdge = x0 + lw + 4; ng.ng_GadgetID = X_VARS;
+    ng.ng_GadgetText = (UBYTE *)"2. Bank MSB/LSB - sound";
     g = g_vars = CreateGadget(LISTVIEW_KIND, g, &ng, GTLV_Labels, (ULONG)&lvars, GTLV_ShowSelected, 0, TAG_DONE);
+    ng.ng_GadgetText = NULL; ng.ng_Flags = 0;
     y += lh + 6;
     ng.ng_Height = fh + 4; ng.ng_Flags = PLACETEXT_LEFT;
     for (p = 0; p < XP_N; p++) {
@@ -148,7 +183,7 @@ int xw_open(App *a)
     g = CreateGadget(BUTTON_KIND, g, &ng, TAG_DONE);
     y += fh + 10;
     if (!g) { FreeGadgets(xgl); xgl = NULL; FreeVisualInfo(xvi); UnlockPubScreen(NULL, scr); return 0; }
-    xw = OpenWindowTags(NULL, WA_Title, (ULONG)"XGM - part", WA_Left, 30, WA_Top, 16,
+    xw = OpenWindowTags(NULL, WA_Title, (ULONG)"Sound / bank - XGM part", WA_Left, 30, WA_Top, 16,
         WA_InnerWidth, lw * 2 + 16, WA_InnerHeight, y - scr->WBorTop - fh - 1,
         WA_Gadgets, (ULONG)xgl, WA_DragBar, TRUE, WA_DepthGadget, TRUE, WA_CloseGadget, TRUE, WA_Activate, TRUE,
         WA_PubScreen, (ULONG)scr,
@@ -175,6 +210,10 @@ void xw_close(void)
 void xw_refresh(App *a)
 {
     if (!xw) return;
+    /* the program names again (GS / XG may have changed with the song) */
+    GT_SetGadgetAttrs(g_progs, xw, NULL, GTLV_Labels, ~0UL, TAG_DONE);
+    fill_progs();
+    GT_SetGadgetAttrs(g_progs, xw, NULL, GTLV_Labels, (ULONG)&lprogs, TAG_DONE);
     xprog = -1;
     show(a);
 }
@@ -214,7 +253,18 @@ int xw_handle(App *a)
             break;
         case X_VARS:
             if (cls != IDCMP_GADGETUP) break;
-            if (code < nvarn) {
+            if (code < nvarn && vidx[code] <= -1000) {
+                /* a GS kit: the program on the part (bank 0) */
+                choose(a, 0, 0, -1000 - vidx[code]);
+                changed = 1;
+                show(a);
+            } else if (code < nvarn && vidx[code] < 0) {
+                int gm, gl, gp;
+                const char *gn;
+                if (vx_gs_get(-1 - vidx[code], &gm, &gl, &gp, &gn)) choose(a, gm, gl, gp);
+                changed = 1;
+                show(a);
+            } else if (code < nvarn) {
                 const VxVoice *v = vx_get(vidx[code]);
                 choose(a, v->msb, v->msb >= 126 || v->msb == 64 ? 0 : v->lsb, v->prog);
                 changed = 1;

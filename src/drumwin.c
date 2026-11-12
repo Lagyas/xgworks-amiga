@@ -46,7 +46,7 @@ static struct TextFont *dmono;
 
 static const char *const DGRIDS[] = {"1/4", "1/8", "1/16", "1/32", "1/8 T", "1/16 T", NULL};
 static const char *const DCHS[] = {"All", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", NULL};
-static const char *const DROWS[] = {"Used", "All", NULL};
+static const char *const DROWS[] = {"Kit", "Used", "All", NULL};
 
 int dw_is_open(void) { return dw != NULL; }
 unsigned long dw_signal(void) { return dw ? 1UL << dw->UserPort->mp_SigBit : 0; }
@@ -88,8 +88,12 @@ static void make_rows(App *a)
        snares, kicks, toms, percussion; Used = the drums of the track */
     vx_drum_order(order);
     nkeys = 0;
-    for (k = 0; k < 128; k++)
-        if (used[order[k]] || dall) keys[nkeys++] = order[k];
+    /* Kit: every drum the kit has (a name), Used: the track's, All: 128 */
+    for (k = 0; k < 128; k++) {
+        int key = order[k], kc = kit_channel(a);
+        int named = dall == 0 && vx_drum_of(kc, a->mx.val[kc][MX_MSB], a->mx.val[kc][MX_PROG], key) != NULL;
+        if (used[key] || named || dall == 2) keys[nkeys++] = key;
+    }
 }
 
 static const int KIND_PEN[6] = {PAL_K_SNARE, PAL_K_PERC, PAL_K_KICK, PAL_K_HAT, PAL_K_CYM, PAL_K_TOM};
@@ -213,7 +217,7 @@ static void draw(App *a)
     Move(rp, (WORD)(gx0 - 1), tb); Draw(rp, (WORD)(gx0 - 1), gy1);
     Move(rp, nx0, (WORD)(gy0 - 1)); Draw(rp, gx1, (WORD)(gy0 - 1));
     if (nkeys == 0) {
-        static const char none[] = "No drums on this track / channel - choose Rows: All";
+        static const char none[] = "No drums on this track / channel - choose Rows: Kit or All";
         SetAPen(rp, black);
         Move(rp, (WORD)(gx0 + 4), (WORD)(gy0 + 2 + rp->TxBaseline));
         Text(rp, (CONST_STRPTR)none, sizeof none - 1);

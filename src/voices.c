@@ -281,6 +281,15 @@ static void load_gs(const char *dir)
 }
 
 void vx_set_gs(int on) { gs_on = on; }
+
+int vx_gs_get(int i, int *msb, int *lsb, int *prog, const char **name)
+{
+    if (i < 0 || i >= ngs) return 0;
+    *msb = gsv[i].msb; *lsb = gsv[i].lsb; *prog = gsv[i].prog; *name = names + gsv[i].name;
+    return 1;
+}
+
+const char *vx_gs_kit(int prog) { return prog >= 0 && prog < 128 && gskit_has[prog] ? names + gskit[prog] : NULL; }
 int vx_gs(void) { return gs_on; }
 int vx_gs_count(void) { return ngs; }
 

@@ -23,6 +23,10 @@ const char *vx_text(uint32_t off);
 void vx_set_gs(int on);
 int  vx_gs(void);
 int  vx_gs_count(void);
+/* GS voice i (SC-8850 list): its bank / program, the name; 0 = no more. */
+int  vx_gs_get(int i, int *msb, int *lsb, int *prog, const char **name);
+/* The GS drum kit of program `prog` (NULL = none). */
+const char *vx_gs_kit(int prog);
 /* The name of a channel's sound for display (never NULL): XG / GM2 / GS by
  * the song, the kit on channel 10, else the GM name. */
 const char *vx_sound(int ch, int msb, int lsb, int prog);

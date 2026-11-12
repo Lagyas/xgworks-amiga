@@ -104,7 +104,11 @@ int app_init(App *a, const char *folder)
     if (!pl_init(&a->pl)) return 0;
     AslBase = OpenLibrary((CONST_STRPTR)"asl.library", 37);
     /* sound names from the XGworks voice lists next to the program (if they are there) */
-    vx_load("PROGDIR:XG4");
+    {
+        int nvx = vx_load("PROGDIR:XG4");
+        if (nvx) snprintf(a->info, sizeof a->info, "Sound names: %d sounds%s from XG4.", nvx, vx_gs_count() ? " and the SC-8850 (GS)" : "");
+        else snprintf(a->info, sizeof a->info, "No voice lists in PROGDIR:XG4 - GM names (see XG4/ReadMe).");
+    }
     app_load_prefs(a);
     if (folder) {
         strncpy(a->folder, folder, sizeof a->folder - 1);

@@ -71,6 +71,8 @@ XGWorksLite - the window
   Staff...   the notation of a track (grand staff), to read.
   New / Close / Save as...  a new song, the song closed, the song as .XWS
              (an XGworks song with its blocks) or .MID by the name.
+  Sound banks: click a track's Sound in the Track View (or Track menu
+             Sound / bank..., or XGM...): 1. program, 2. bank and sound.
   Track View...  opens with every song (as the web main view): Trk, Ch,
              Name, S, M, Sound and the blocks along the bars: select, drag to
              move (with their events), Create, Repeat, Rename, Delete, Copy /

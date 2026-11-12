@@ -83,7 +83,7 @@ static struct NewMenu nm[] = {
     {NM_ITEM, (STRPTR)"Drums", (STRPTR)"D", 0, 0, (APTR)M_DRUMS},
     {NM_ITEM, (STRPTR)"Lyrics / Karaoke", (STRPTR)"Y", 0, 0, (APTR)M_LYRICS},
     {NM_ITEM, (STRPTR)"Mixer", (STRPTR)"M", 0, 0, (APTR)M_MIXER},
-    {NM_ITEM, (STRPTR)"XGM part editor", (STRPTR)"X", 0, 0, (APTR)M_XGM},
+    {NM_ITEM, (STRPTR)"Sound / bank...", (STRPTR)"X", 0, 0, (APTR)M_XGM},
     {NM_ITEM, NM_BARLABEL, NULL, 0, 0, NULL},
     {NM_ITEM, (STRPTR)"Demix by Channel...", NULL, 0, 0, (APTR)M_DEMIXCH},
     {NM_ITEM, (STRPTR)"Demix by Note...", NULL, 0, 0, (APTR)M_DEMIXNOTE},
@@ -378,7 +378,7 @@ int tv_open(App *a)
         /* the messages on a row of their own */
         y += fh + 7;
         ng.ng_LeftEdge = (WORD)(scr->WBorLeft + 4); ng.ng_TopEdge = y; ng.ng_Width = 580; ng.ng_GadgetText = NULL; ng.ng_GadgetID = V_INFO;
-        g = g_info = CreateGadget(TEXT_KIND, g, &ng, GTTX_Text, (ULONG)"Click a track, then Demix Ch... / Demix Note... (also the right mouse button menu).", GTTX_Border, TRUE, TAG_DONE);
+        g = g_info = CreateGadget(TEXT_KIND, g, &ng, GTTX_Text, (ULONG)"Click a track's Sound to choose its program / bank. Demix: click a track, Demix Ch... / Note...", GTTX_Border, TRUE, TAG_DONE);
     }
     tb = (WORD)(y + fh + 7);
     if (!g) { FreeGadgets(vgl); vgl = NULL; FreeVisualInfo(vvi); UnlockPubScreen(NULL, scr); pal_close(); return 0; }
@@ -652,7 +652,11 @@ static int menu_pick(App *a, int id)
     case M_DRUMS: dw_open(a); break;
     case M_LYRICS: kw_open(a); break;
     case M_MIXER: a->want_mixer = 1; break;
-    case M_XGM: xw_open(a); break;
+    case M_XGM: {
+        int ch = vtrk >= 0 ? ed_channel(&a->ed, (uint32_t)vtrk) : -1;
+        if (ch >= 0) xw_open_part(a, ch); else xw_open(a);
+        break;
+    }
     case M_DEMIXCH: demix_open(a, 0); break;
     case M_DEMIXNOTE: demix_open(a, 1); break;
     case M_TRANSPOSE: jw_open_job(a, 0); break;
@@ -807,6 +811,12 @@ int tv_handle(App *a)
                     WORD col = (WORD)((mx - cx0 - 2) / (vmono ? vmono->tf_XSize : 8));
                     if (col == 20) { a->ed.trk[r].solo = (uint8_t)!a->ed.trk[r].solo; app_track_mute(a); }
                     else if (col == 22) { a->ed.trk[r].mute = (uint8_t)!a->ed.trk[r].mute; app_track_mute(a); }
+                    else if (col >= 24) {
+                        /* the Sound: choose the program / bank of the track's channel */
+                        int ch = ed_channel(&a->ed, (uint32_t)r);
+                        if (ch >= 0) xw_open_part(a, ch);
+                        else info("The track has no channel messages.");
+                    }
                     draw(a);
                     break;
                 }

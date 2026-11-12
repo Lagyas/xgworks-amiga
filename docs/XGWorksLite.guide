@@ -135,14 +135,20 @@ A song with a GS reset or GS effect messages is treated as GS, any other as
 XG. Changes are heard at once and saved into the song like the mixer's.
 @endnode
 
-@node XGM "XGM part editor"
-One part (@{b}Part 1-16@{ub}) at a time:
+@node XGM "Sound / bank (XGM part editor)"
+Here the sound banks are switched. It opens with a click on a track's
+@{b}Sound@{ub} in the Track View (for the track's channel), with Sound / bank... of
+the Track menu, or with XGM... in the main window. One part (@{b}Part 1-16@{ub}) at
+a time:
 
   @{b}Sound@{ub}   the sound now (bank MSB / LSB / program and its name)
-  left list    the 128 programs, then SFX and the drum kits: a click sets
+  1. Program   the 128 programs, then SFX and the drum kits: a click sets
                the program's main sound
-  right list   its variations (bank MSB / LSB and name), the SFX or the
-               drum kits: a click sets that sound
+  2. Bank      the program in every bank: its variations (bank MSB / LSB
+               and name - MU2000 / MU128 voices, MU Sampling, VL70-m, the
+               PLG boards, GM2 ...), the SFX or the drum kits; a click sets
+               that sound. A GS song lists the SC-8850 variations and the
+               GS kits.
   sliders      the XG part parameters: Note Shift, Variation Send,
                Vibrato Rate / Depth / Delay, Cutoff, Resonance, Attack,
                Decay, Release, Bend Range (0 = the sound's own)
@@ -303,8 +309,9 @@ pages. Every change is heard at once.
 @endnode
 
 @node Drums "Drum editor"
-As the Drum window of the PC / web version: one row per drum - the drums
-the track uses, or all (@{b}Rows@{ub}) - in XGworks' order (brushes, cymbals,
+As the Drum window of the PC / web version: one row per drum - @{b}Rows@{ub}:
+@{b}Kit@{ub} every drum of the kit (and the track's), @{b}Used@{ub} only the track's,
+@{b}All@{ub} all 128 keys - in XGworks' order (brushes, cymbals,
 hi-hats, snares, kicks, toms, percussion; from inst.ini), each named after
 the drum kit of the channel (bank and program: Standard, Room, Analog ...
 Kit, from Drum Kit.ini; else the Standard Kit's, else the GM name), and one

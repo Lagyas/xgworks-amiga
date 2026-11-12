@@ -25,6 +25,11 @@ jobs:
           pip install --break-system-packages amitools greenlet machine68k
           vamos --cpu 68020 XGPlay build/test.mid DUMP > build/amiga.txt
           diff build/host.txt build/amiga.txt && echo "XGPlay on 68020 = PC build: OK"
+          python3 tools/gen_xg4_fixture.py build/xg4
+          build/vxdump build/xg4 > build/vx-host.txt
+          vamos --cpu 68020 VxDump build/xg4 > build/vx-amiga.txt
+          head -3 build/vx-host.txt; grep -c . build/vx-host.txt
+          diff build/vx-host.txt build/vx-amiga.txt && echo "Voice lists on 68020 = PC build: OK"
       - name: Package
         run: |
           mkdir -p "out/XGWorks Lite"
