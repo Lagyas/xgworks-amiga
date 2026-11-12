@@ -143,8 +143,7 @@ void mixmui_refresh(App *a)
         const uint8_t *v = a->mx.val[c];
         int k;
         {
-            const char *vn = vx_name(v[MX_MSB], v[MX_LSB], v[MX_PROG]);
-            SetAttrs(name[c], MUIA_Text_Contents, (ULONG)(vn ? vn : c == 9 && v[MX_MSB] == 0 ? "Drums" : v[MX_MSB] == 127 ? "Drum kit" : mx_gm_names[v[MX_PROG] & 127]), TAG_DONE);
+            SetAttrs(name[c], MUIA_Text_Contents, (ULONG)vx_sound(c, v[MX_MSB], v[MX_LSB], v[MX_PROG]), TAG_DONE);
         }
         for (k = 0; k < C_MUTE; k++) {
             int val = v[PARAM[k]];
@@ -195,8 +194,7 @@ int mixmui_handle(App *a, unsigned long id)
         app_mix(a, c, PARAM[k], v);
         if (k <= C_LSB) {
             const uint8_t *v = a->mx.val[c];
-            const char *vn = vx_name(v[MX_MSB], v[MX_LSB], v[MX_PROG]);
-            SetAttrs(name[c], MUIA_Text_Contents, (ULONG)(vn ? vn : v[MX_MSB] == 127 ? "Drum kit" : mx_gm_names[v[MX_PROG] & 127]), TAG_DONE);
+            SetAttrs(name[c], MUIA_Text_Contents, (ULONG)vx_sound(c, v[MX_MSB], v[MX_LSB], v[MX_PROG]), TAG_DONE);
         }
     }
     return 1;

@@ -399,12 +399,21 @@ the job, @{b}Undo@{ub} takes it back.
 @node XG4 "Sound names (XG4)"
 The sound and drum names of the Track View, the Event List (program
 changes, drum notes), the XGM editor, the mixer and the Drum editor come
-from the voice lists of your XGworks V4.0 installation. Copy these files
-into the folder @{b}XG4@{ub} next to XGWorksLite:
+from the voice lists of your XGworks V4.0 installation. Copy into the
+folder @{b}XG4@{ub} next to XGWorksLite:
 
-  Melody.ini, SFX.ini, SFX Kit.ini, Drum Kit.ini, inst.ini
+  ws.ini and all the voice lists it names (*.ini of the XG4 folder):
+      Melody (MU2000 / MU128 / MU100 voices and their variations), MU
+      Sampling Voice, VL70-m, Model Exclusive, SFX, the PLG150 / PLG100
+      boards (AN, PF, DX, VL, SG), GM2 Normal, the kits (Drum Kit, SFX /
+      MU Sampling Kit, GM2 SFX Kit)
+  inst.ini   the Drum editor's row order and the colours of the drums
+  midi-file-editor.html   (when you have it) the GS names of the SC-8850
 
-(inst.ini: the Drum editor's row order and the colours of the drums.)
+Without ws.ini only Melody.ini, SFX.ini, SFX Kit.ini and Drum Kit.ini are
+read. A GS song (the Reset choice GS, or "Song's own" with GS messages in
+the song) shows the SC-8850 names (bank MSB = variation, LSB = map); its
+drums have the GM names.
 
 Without them General MIDI names are shown. They are read when the program
 starts; nothing of them is built into XGWorks Lite.

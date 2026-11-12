@@ -236,6 +236,9 @@ int gui_mui(App *a)
             break;
         case ID_RESET:
             a->reset = (int)getv(creset, MUIA_Cycle_Active);
+            app_names_std(a);
+            eds_refresh(a);
+            mixmui_refresh(a);
             break;
         case ID_OUT:
             a->output = (int)getv(cout, MUIA_Cycle_Active);

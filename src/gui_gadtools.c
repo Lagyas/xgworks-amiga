@@ -366,6 +366,9 @@ int gui_gadtools(App *a)
                     break;
                 case G_RESET:
                     a->reset = code;
+                    app_names_std(a);
+                    eds_refresh(a);
+                    mixgt_refresh(a);
                     break;
                 case G_OUT:
                     a->output = code;

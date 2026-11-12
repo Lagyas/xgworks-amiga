@@ -68,7 +68,8 @@ static void fill_vars(int p)
         (vidx = (int *)calloc((size_t)cnt + 1, sizeof(int)))) {
         for (i = 0; i < cnt; i++) {
             const VxVoice *v = vx_get(i);
-            int ok = p < 128 ? (v->prog == p && v->msb < 126) : p == 128 ? v->msb == 64 : v->msb >= 126;
+            int kit = v->msb >= 126 || v->msb == 120;   /* XG, SFX and GM2 kits */
+            int ok = p < 128 ? (v->prog == p && !kit) : p == 128 ? v->msb == 64 : kit;
             if (!ok) continue;
             snprintf(tvars[n], 48, "%3d/%-3d %s", v->msb, p < 128 ? v->lsb : v->prog + 1, vx_text(v->name));
             nvars[n].ln_Name = tvars[n];
@@ -89,11 +90,10 @@ static void fill_vars(int p)
 static void show(App *a)
 {
     const uint8_t *v = a->mx.val[xpart];
-    const char *n = vx_name(v[MX_MSB], v[MX_LSB], v[MX_PROG]);
+    const char *n = vx_sound(xpart, v[MX_MSB], v[MX_LSB], v[MX_PROG]);
     int p;
     if (!xw) return;
-    snprintf(soundbuf, sizeof soundbuf, "%d/%d/%d  %s", v[MX_MSB], v[MX_LSB], v[MX_PROG] + 1,
-             n ? n : v[MX_MSB] >= 126 ? "Drums" : mx_gm_names[v[MX_PROG] & 127]);
+    snprintf(soundbuf, sizeof soundbuf, "%d/%d/%d  %s", v[MX_MSB], v[MX_LSB], v[MX_PROG] + 1, n);
     GT_SetGadgetAttrs(g_sound, xw, NULL, GTTX_Text, (ULONG)soundbuf, TAG_DONE);
     for (p = 0; p < XP_N; p++) GT_SetGadgetAttrs(g_sl[p], xw, NULL, GTSL_Level, (WORD)(a->mx.xp[xpart][p] - mx_xp[p].shown), TAG_DONE);
     if (xprog != (v[MX_MSB] >= 126 ? 129 : v[MX_MSB] == 64 ? 128 : v[MX_PROG])) {

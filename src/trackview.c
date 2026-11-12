@@ -195,9 +195,8 @@ static void draw(App *a)
             char chs[4], snd[44] = "";
             if (ch >= 0) {
                 const uint8_t *v = a->mx.val[ch];
-                const char *vn = vx_name(v[MX_MSB], v[MX_LSB], v[MX_PROG]);
                 sprintf(chs, "%2d", ch + 1);
-                snprintf(snd, sizeof snd, "%s", vn ? vn : (ch == 9 || v[MX_MSB] >= 126) ? "Drums" : mx_gm_names[v[MX_PROG] & 127]);
+                snprintf(snd, sizeof snd, "%s", vx_sound(ch, v[MX_MSB], v[MX_LSB], v[MX_PROG]));
             } else strcpy(chs, " -");
             snprintf(txt, sizeof txt, "%3d %s %-12.12s %c %c %-12.12s", ti + 1, chs, nm, a->ed.trk[ti].solo ? 'S' : '.', a->ed.trk[ti].mute ? 'M' : '.', snd);
         }

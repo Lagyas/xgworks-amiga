@@ -100,6 +100,8 @@ void app_help(void);
 void app_time(char *out, uint32_t us);
 /* Settings in ENVARC:XGWorksLite.prefs (folder, reset, output, tempo). */
 void app_load_prefs(App *a);
+/* The sound names after the song's standard (GS or XG); after Reset changes. */
+void app_names_std(App *a);
 void app_save_prefs(const App *a);
 
 #endif

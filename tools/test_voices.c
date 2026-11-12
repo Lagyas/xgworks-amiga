@@ -36,6 +36,20 @@ int main(int argc, char **argv)
         bad += !seen || vx_drum_kind(36) != 2 || vx_drum_kind(42) != 3;
     }
     printf("%s\n", bad ? "FAIL" : "OK (drums)");
+    /* the other lists of ws.ini (when the installation has them) */
+    s = vx_name(16, 0, 0); printf("MU Sampling 16/0/0 = %s\n", s ? s : "-");
+    s = vx_name(33, 0, 0); printf("VL70-m 33/0/0 = %s\n", s ? s : "-");
+    s = vx_name(121, 0, 0); printf("GM2 121/0/0 = %s\n", s ? s : "-");
+    s = vx_name(100, 0, 38); printf("PLG150-AN 100/0/38 = %s\n", s ? s : "-");
+    s = vx_sound(9, 0, 0, 25); printf("ch10 XG prog 26 = %s\n", s);
+    printf("GS voices: %d\n", vx_gs_count());
+    if (vx_gs_count()) {
+        vx_set_gs(1);
+        s = vx_sound(0, 0, 0, 0); printf("GS 0/0/0 = %s\n", s);
+        s = vx_sound(0, 8, 0, 4); printf("GS 8/0/4 = %s\n", s);
+        s = vx_sound(9, 0, 0, 25); printf("GS ch10 prog 26 = %s\n", s);
+        vx_set_gs(0);
+    }
     vx_free();
     return bad;
 }

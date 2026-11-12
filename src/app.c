@@ -203,6 +203,7 @@ void app_mix_reset(App *a)
     Mixer old = a->mx;
     if (a->cur < 0) return;
     mx_from_song(&a->mx, &a->song);
+    app_names_std(a);
     memcpy(a->mx.mute, old.mute, sizeof old.mute);
     memcpy(a->mx.solo, old.solo, sizeof old.solo);
     /* the song's values out again, for what was changed */
@@ -322,6 +323,7 @@ int app_load(App *a, int k)
         free(xws_raw);
     }
     mx_from_song(&a->mx, &a->song);
+    app_names_std(a);
     ly_build(&a->ly, &a->song, a->letters);
     a->len_us = a->song.nev ? xg_tick_us(&a->song, a->song.ev[a->song.nev - 1].tick) : 0;
     {
@@ -421,10 +423,18 @@ static int rebuild(App *a)
     a->song = ns;
     a->len_us = ns.nev ? xg_tick_us(&ns, ns.ev[ns.nev - 1].tick) : 0;
     mx_from_song(&a->mx, &a->song);
+    app_names_std(a);
     mx_keep_user(&a->mx, &keep);
     ly_build(&a->ly, &a->song, a->letters);
     app_track_mute(a);
     return 1;
+}
+
+/* The sound names of the song's standard: GS (SC-8850 names) for the Reset
+   choice GS, or with "Song's own" a song with GS messages; else XG / GM. */
+void app_names_std(App *a)
+{
+    vx_set_gs(a->reset == 3 || (a->reset == 0 && a->mx.fx.gs));
 }
 
 int app_ed_commit(App *a)

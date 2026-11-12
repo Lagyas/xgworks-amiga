@@ -232,10 +232,8 @@ static void name_suffix(const BankSt *b, const EdEv *e, char *line, size_t max)
     size_t l;
     if (e->st >= 0xF0) return;
     if (k == 0xC0) {
-        n = vx_name(b->msb[ch], b->lsb[ch], e->d1);
-        if (!n && b->msb[ch] >= 126) n = vx_name(b->msb[ch], 0, e->d1);
-        if (!n) n = ch == 9 || b->msb[ch] >= 126 ? "Drums" : mx_gm_names[e->d1 & 127];
-    } else if ((k == 0x90 || k == 0x80 || k == 0xA0) && (ch == 9 || b->msb[ch] >= 126)) {
+        n = vx_sound(ch, b->msb[ch], b->lsb[ch], e->d1);
+    } else if ((k == 0x90 || k == 0x80 || k == 0xA0) && (ch == 9 || (!vx_gs() && (b->msb[ch] >= 126 || b->msb[ch] == 120)))) {
         n = vx_drum_of(ch, b->msb[ch], b->prog[ch], e->d1);
     }
     if (!n) return;

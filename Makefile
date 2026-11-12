@@ -25,7 +25,7 @@ host: $(SRC) src/smf.h src/mixer.c tools/test_mixer.c
 	$(HOSTCC) -O2 -Wall -Wextra -std=c99 -o build/xws2mid tools/xws2mid.c src/xws.c
 	$(HOSTCC) -O2 -Wall -Wextra -std=c99 -o build/test_edit tools/test_edit.c src/edit.c
 	$(HOSTCC) -O2 -Wall -Wextra -std=c99 -o build/test_roll tools/test_roll.c src/edit.c src/rollops.c
-	$(HOSTCC) -O2 -Wall -Wextra -std=c99 -o build/test_voices tools/test_voices.c src/voices.c src/drumops.c src/rollops.c src/edit.c
+	$(HOSTCC) -O2 -Wall -Wextra -std=c99 -o build/test_voices tools/test_voices.c src/voices.c src/drumops.c src/rollops.c src/edit.c src/mixer.c src/fx.c src/smf.c
 	$(HOSTCC) -O2 -Wall -Wextra -std=c99 -o build/jobrun tools/jobrun.c src/edit.c src/jobs.c src/drumops.c src/rollops.c
 	$(HOSTCC) -O2 -Wall -Wextra -std=c99 -o build/test_blocks tools/test_blocks.c src/edit.c src/blocks.c src/xws.c src/xwswrite.c
 	$(HOSTCC) -O2 -Wall -Wextra -std=c99 -o build/test_lyrtools tools/test_lyrtools.c src/edit.c src/drumops.c src/lyrtools.c src/lyrics.c src/rollops.c src/smf.c src/textmap.c src/textmap_data.c

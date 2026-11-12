@@ -18,6 +18,14 @@ void vx_free(void);
 int  vx_count(void);
 const VxVoice *vx_get(int i);
 const char *vx_text(uint32_t off);
+/* GS names (SC-8850 map from the user's midi-file-editor.html in XG4) for
+ * a GS song, else the XG lists. */
+void vx_set_gs(int on);
+int  vx_gs(void);
+int  vx_gs_count(void);
+/* The name of a channel's sound for display (never NULL): XG / GM2 / GS by
+ * the song, the kit on channel 10, else the GM name. */
+const char *vx_sound(int ch, int msb, int lsb, int prog);
 /* The name of a sound (NULL = not in the lists). */
 const char *vx_name(int msb, int lsb, int prog);
 /* The name of a drum key in a kit (msb 126 / 127, prog), NULL = none. */
