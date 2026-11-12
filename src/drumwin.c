@@ -27,10 +27,11 @@
 #include "screen.h"
 #include "pal.h"
 #include "mixer.h"
+#include "xgmwin.h"
 
 extern struct Library *GadToolsBase;
 
-enum { D_GRID = 1, D_CH, D_VEL, D_ROWS, D_HOUT, D_HIN, D_UNDO, D_HPROP, D_VPROP };
+enum { D_GRID = 1, D_CH, D_VEL, D_ROWS, D_HOUT, D_HIN, D_UNDO, D_HPROP, D_VPROP, D_KIT };
 
 static struct Window *dw;
 static struct Gadget *dgl, *hprop, *vprop;
@@ -190,12 +191,19 @@ static void draw(App *a)
         /* the kind's colour as a mark at the left */
         SetAPen(rp, pal(KIND_PEN[kind > 5 ? 1 : kind], pen_fill));
         RectFill(rp, (WORD)(nx0 + 2), (WORD)(y + 1), (WORD)(nx0 + 4), (WORD)(y + rh - 3));
-        sprintf(txt, "%3d %-13.13s", key, drum_name(a, key));
-        if (dmono) SetFont(rp, dmono);
+        {
+            const char *dn = drum_name(a, key);
+            int j, o, maxc = (gx0 - nx0 - 12) / (rp->TxWidth ? rp->TxWidth : 8);
+            o = sprintf(txt, "%3d ", key);
+            /* only printable letters (a byte of another set: '?') */
+            for (j = 0; dn[j] && o < maxc && o < (int)sizeof txt - 1; j++)
+                txt[o++] = (char)((unsigned char)dn[j] < 32 || ((unsigned char)dn[j] >= 127 && (unsigned char)dn[j] < 160) ? '?' : dn[j]);
+            txt[o] = 0;
+        }
         SetAPen(rp, black);
+        SetDrMd(rp, JAM1);
         Move(rp, (WORD)(nx0 + 7), (WORD)(y + (rh - rp->TxHeight) / 2 + rp->TxBaseline));
         Text(rp, (CONST_STRPTR)txt, strlen(txt));
-        SetFont(rp, dw->WScreen->RastPort.Font);
         /* the row line */
         SetAPen(rp, line);
         Move(rp, gx0, (WORD)(y + rh - 1)); Draw(rp, gx1, (WORD)(y + rh - 1));
@@ -241,7 +249,11 @@ static void title(App *a)
     const uint8_t *nm = ed_name(&a->ed, (uint32_t)dtrk, &len);
     char n[44] = "";
     if (nm) { uint32_t l = len > 40 ? 40 : len; memcpy(n, nm, l); n[l] = 0; }
-    snprintf(t, sizeof t, "Drums - %d %s", dtrk + 1, n);
+    {
+        int kc = kit_channel(a);
+        snprintf(t, sizeof t, "Drums - %d %s - ch %d %s (%d sounds)", dtrk + 1, n, kc + 1,
+                 vx_sound(kc, a->mx.val[kc][MX_MSB], a->mx.val[kc][MX_LSB], a->mx.val[kc][MX_PROG]), vx_count());
+    }
     SetWindowTitles(dw, (CONST_STRPTR)t, (CONST_STRPTR)~0);
 }
 
@@ -313,6 +325,9 @@ int dw_open(App *a)
     g = CreateGadget(BUTTON_KIND, g, &ng, TAG_DONE);
     x += 32;
     ng.ng_LeftEdge = x; ng.ng_Width = 50; ng.ng_GadgetText = (UBYTE *)"Undo"; ng.ng_GadgetID = D_UNDO;
+    g = CreateGadget(BUTTON_KIND, g, &ng, TAG_DONE);
+    x += 54;
+    ng.ng_LeftEdge = x; ng.ng_Width = 54; ng.ng_GadgetText = (UBYTE *)"Kit..."; ng.ng_GadgetID = D_KIT;
     g = CreateGadget(BUTTON_KIND, g, &ng, TAG_DONE);
     tb = (WORD)(tb + fh + 7);
     if (!g) { FreeGadgets(dgl); dgl = NULL; FreeVisualInfo(dvi); UnlockPubScreen(NULL, scr); pal_close(); return 0; }
@@ -412,6 +427,7 @@ int dw_handle(App *a)
             case D_HOUT: if (spx > 4) spx -= 2; break;
             case D_HIN: if (spx < 40) spx += 2; break;
             case D_UNDO: app_undo(a); changed = 1; break;
+            case D_KIT: xw_open_kits(a, kit_channel(a)); break;
             }
             draw(a);
             break;

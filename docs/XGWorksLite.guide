@@ -136,9 +136,10 @@ XG. Changes are heard at once and saved into the song like the mixer's.
 @endnode
 
 @node XGM "Sound / bank (XGM part editor)"
-Here the sound banks are switched. It opens with a click on a track's
-@{b}Sound@{ub} in the Track View (for the track's channel), with Sound / bank... of
-the Track menu, or with XGM... in the main window. One part (@{b}Part 1-16@{ub}) at
+Here the sound banks are switched. It opens with the @{b}Sound...@{ub} button of
+the Track View or a click on a track's Sound there (for the track's
+channel), with Sound / bank... of the Track menu, with @{b}Kit...@{ub} of the Drum
+editor (the drum kits listed), or with XGM... in the main window. One part (@{b}Part 1-16@{ub}) at
 a time:
 
   @{b}Sound@{ub}   the sound now (bank MSB / LSB / program and its name)

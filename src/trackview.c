@@ -41,7 +41,7 @@
 
 extern struct Library *GadToolsBase;
 
-enum { V_FROM = 1, V_TO, V_CREATE, V_COUNT, V_REPEAT, V_NAME, V_COPY, V_CUT, V_PASTE, V_DEL, V_OUT, V_IN, V_UNDO, V_HPROP, V_VPROP, V_INFO, V_DMCH, V_DMNOTE, V_ROLL, V_LIST };
+enum { V_FROM = 1, V_TO, V_CREATE, V_COUNT, V_REPEAT, V_NAME, V_COPY, V_CUT, V_PASTE, V_DEL, V_OUT, V_IN, V_UNDO, V_HPROP, V_VPROP, V_INFO, V_DMCH, V_DMNOTE, V_ROLL, V_LIST, V_SOUND };
 
 static struct Window *vw;
 static struct Gadget *vgl, *hprop, *vprop, *g_from, *g_to, *g_count, *g_name, *g_info;
@@ -362,6 +362,9 @@ int tv_open(App *a)
     x += 64 + 44;
     ng.ng_Flags = PLACETEXT_LEFT; ng.ng_LeftEdge = x; ng.ng_Width = 110; ng.ng_GadgetText = (UBYTE *)"Name"; ng.ng_GadgetID = V_NAME;
     g = g_name = CreateGadget(STRING_KIND, g, &ng, GTST_MaxChars, 38, TAG_DONE);
+    x += 110 + 8;
+    ng.ng_Flags = PLACETEXT_IN; ng.ng_LeftEdge = x; ng.ng_Width = 76; ng.ng_GadgetText = (UBYTE *)"Sound..."; ng.ng_GadgetID = V_SOUND;
+    g = CreateGadget(BUTTON_KIND, g, &ng, TAG_DONE);
     y += fh + 7;
     {
         static const char *const bt[11] = {"Copy", "Cut", "Paste", "Delete", "-", "+", "Undo", "Roll", "List", "Demix Ch...", "Demix Note..."};
@@ -791,6 +794,10 @@ int tv_handle(App *a)
             case V_OUT: if (bpx > 6) bpx -= 6; break;
             case V_IN: if (bpx < 120) bpx += 6; break;
             case V_UNDO: app_undo(a); nsel = 0; changed = 1; break;
+            case V_SOUND:
+                if (vtrk < 0) { info("Click a track first."); break; }
+                menu_pick(a, M_XGM);
+                break;
             case V_ROLL: case V_LIST: case V_DMCH: case V_DMNOTE:
                 if (vtrk < 0) { info("Click a track first."); break; }
                 menu_pick(a, src->GadgetID == V_ROLL ? M_ROLL : src->GadgetID == V_LIST ? M_LIST : src->GadgetID == V_DMCH ? M_DEMIXCH : M_DEMIXNOTE);

@@ -134,6 +134,17 @@ int xw_open_part(App *a, int part)
     return xw_open(a);
 }
 
+int xw_open_kits(App *a, int part)
+{
+    int r = xw_open_part(a, part);
+    if (r && xw) {
+        xprog = 129;
+        GT_SetGadgetAttrs(g_progs, xw, NULL, GTLV_Selected, 129, GTLV_MakeVisible, 129, TAG_DONE);
+        fill_vars(129);
+    }
+    return r;
+}
+
 int xw_open(App *a)
 {
     struct Screen *scr;
