@@ -21,6 +21,7 @@
 #include "staffwin.h"
 #include "jobwin.h"
 #include "trackview.h"
+#include "transport.h"
 #include "screen.h"
 
 struct Library *MUIMasterBase;
@@ -29,7 +30,7 @@ struct Library *MUIMasterBase;
 #define MAKE_ID(a, b, c, d) ((ULONG)(a) << 24 | (ULONG)(b) << 16 | (ULONG)(c) << 8 | (ULONG)(d))
 #endif
 
-enum { ID_PLAY = 1, ID_STOP, ID_PREV, ID_NEXT, ID_OPEN, ID_FOLDER, ID_LIST, ID_POS, ID_TEMPO, ID_TRANS, ID_RESET, ID_OUT, ID_MIX, ID_LYR, ID_TRK, ID_ROLL, ID_DRUMS, ID_TEXTS, ID_XGM, ID_LYRED, ID_STAFF, ID_JOBS, ID_TV, ID_NEW, ID_CLOSE, ID_SAVEAS, ID_SCREEN };
+enum { ID_PLAY = 1, ID_STOP, ID_PREV, ID_NEXT, ID_OPEN, ID_FOLDER, ID_LIST, ID_POS, ID_TEMPO, ID_TRANS, ID_RESET, ID_OUT, ID_MIX, ID_LYR, ID_TRK, ID_ROLL, ID_DRUMS, ID_TEXTS, ID_XGM, ID_LYRED, ID_STAFF, ID_JOBS, ID_TV, ID_NEW, ID_CLOSE, ID_SAVEAS, ID_SCREEN, ID_HIDE, ID_SONGS, ID_SAVE, ID_PLAYCUR };
 
 static Object *app, *win, *list, *spos, *ttime, *stempo, *strans, *creset, *cout, *tinfo, *lv;
 static Object *bprev, *bplay, *bstop, *bnext, *bopen, *bdir, *bmix, *blyr, *btrk, *broll, *bdrum, *btext, *bxgm, *blyred, *bstaff, *bjobs, *btv, *bnew, *bclose, *bsaveas;
@@ -50,11 +51,14 @@ static void fill_list(App *a)
     SetAttrs(list, MUIA_List_Quiet, FALSE, TAG_DONE);
 }
 
+static uint32_t stop_pos;   /* the position while stopped (exact, the slider has seconds) */
+
 static void show(App *a)
 {
     static char t[40];
     char x[16], y[16];
-    uint32_t pos = app_playing(a) ? a->pl.pos_us : getv(spos, MUIA_Numeric_Value) * 1000000UL;
+    uint32_t pos = app_playing(a) ? a->pl.pos_us : stop_pos;
+    if (app_playing(a)) stop_pos = pos;
     app_time(x, pos);
     app_time(y, a->len_us);
     sprintf(t, "%s / %s", x, y);
@@ -82,6 +86,7 @@ static void start(App *a, int k, uint32_t from)
     kw_update(a, from, 1);
     SetAttrs(spos, MUIA_NoNotify, TRUE, MUIA_Numeric_Max, a->len_us / 1000000 + 1, MUIA_Numeric_Value, from / 1000000, TAG_DONE);
     SetAttrs(list, MUIA_NoNotify, TRUE, MUIA_List_Active, k, TAG_DONE);
+    stop_pos = from;
     app_play(a, from);
     show(a);
 }
@@ -100,7 +105,7 @@ int gui_mui(App *a)
         MUIA_Application_HelpFile, (ULONG)"PROGDIR:XGWorksLite.guide",
         SubWindow, win = WindowObject,
             scr_pubname() ? MUIA_Window_PublicScreen : TAG_IGNORE, (ULONG)scr_pubname(),
-            MUIA_Window_Title, (ULONG)"XGWorks Lite",
+            MUIA_Window_Title, (ULONG)"XGWorks Lite - Songs",
             MUIA_Window_ID, MAKE_ID('X', 'G', 'W', 'L'),
             MUIA_HelpNode, (ULONG)"Main_Window",
             WindowContents, VGroup,
@@ -175,7 +180,8 @@ int gui_mui(App *a)
         mixmui_create(a, app);
         for (k = 0; k < 20; k++) DoMethod(btn[k], MUIM_Notify, MUIA_Pressed, FALSE, (ULONG)app, 2, MUIM_Application_ReturnID, ids[k]);
     }
-    DoMethod(win, MUIM_Notify, MUIA_Window_CloseRequest, TRUE, (ULONG)app, 2, MUIM_Application_ReturnID, MUIV_Application_ReturnID_Quit);
+    /* the Songs window closes (the Track View is the main window) */
+    DoMethod(win, MUIM_Notify, MUIA_Window_CloseRequest, TRUE, (ULONG)app, 2, MUIM_Application_ReturnID, ID_HIDE);
     DoMethod(lv, MUIM_Notify, MUIA_Listview_DoubleClick, TRUE, (ULONG)app, 2, MUIM_Application_ReturnID, ID_LIST);
     DoMethod(spos, MUIM_Notify, MUIA_Numeric_Value, MUIV_EveryTime, (ULONG)app, 2, MUIM_Application_ReturnID, ID_POS);
     DoMethod(stempo, MUIM_Notify, MUIA_Numeric_Value, MUIV_EveryTime, (ULONG)app, 2, MUIM_Application_ReturnID, ID_TEMPO);
@@ -184,11 +190,37 @@ int gui_mui(App *a)
     DoMethod(cout, MUIM_Notify, MUIA_Cycle_Active, MUIV_EveryTime, (ULONG)app, 2, MUIM_Application_ReturnID, ID_OUT);
     DoMethod(cscreen, MUIM_Notify, MUIA_Cycle_Active, MUIV_EveryTime, (ULONG)app, 2, MUIM_Application_ReturnID, ID_SCREEN);
     fill_list(a);
-    SetAttrs(win, MUIA_Window_Open, TRUE, TAG_DONE);
+    /* the main window: the Track View (as the web / PC version), and the Transport */
+    if (!tv_open(a)) SetAttrs(win, MUIA_Window_Open, TRUE, TAG_DONE);
+    tr_open(a);
     show(a);
     while (running) {
-        id = DoMethod(app, MUIM_Application_NewInput, (ULONG)&sigs);
+        if (a->want_cmd) {
+            /* a command of the Track View / Transport */
+            static const ULONG CMD_IDS[] = {0, ID_NEW, ID_OPEN, ID_SAVE, ID_SAVEAS, ID_CLOSE, ID_SONGS, ID_PLAYCUR, ID_STOP,
+                                            MUIV_Application_ReturnID_Quit, ID_FOLDER};
+            id = a->want_cmd > 0 && a->want_cmd <= CMD_FOLDER ? CMD_IDS[a->want_cmd] : 0;
+            a->want_cmd = CMD_NONE;
+        } else id = DoMethod(app, MUIM_Application_NewInput, (ULONG)&sigs);
         switch (id) {
+        case ID_HIDE:
+            SetAttrs(win, MUIA_Window_Open, FALSE, TAG_DONE);
+            break;
+        case ID_SONGS:
+            SetAttrs(win, MUIA_Window_Open, TRUE, TAG_DONE);
+            break;
+        case ID_SAVE:
+            if (a->cur >= 0) app_save(a); else snprintf(a->info, sizeof a->info, "No song to save.");
+            show(a);
+            break;
+        case ID_PLAYCUR: {
+            int k = a->cur >= 0 ? a->cur : (int)(LONG)getv(list, MUIA_List_Active);
+            if (k < 0) k = 0;
+            if (k < a->count) start(a, k, k == a->cur ? stop_pos : 0);
+            else snprintf(a->info, sizeof a->info, "No songs: Open or Songs.");
+            show(a);
+            break;
+        }
         case MUIV_Application_ReturnID_Quit:
             running = 0;
             break;
@@ -198,7 +230,7 @@ int gui_mui(App *a)
         case ID_PLAY: {
             int k = (int)(LONG)getv(list, MUIA_List_Active);
             if (k < 0) k = a->cur >= 0 ? a->cur : 0;
-            start(a, k, k == a->cur ? getv(spos, MUIA_Numeric_Value) * 1000000UL : 0);
+            start(a, k, k == a->cur ? stop_pos : 0);
             break;
         }
         case ID_STOP:
@@ -216,6 +248,7 @@ int gui_mui(App *a)
             struct Window *w = NULL;
             int r;
             GetAttr(MUIA_Window_Window, win, (ULONG *)&w);
+            if (!w) w = tv_window();
             SetAttrs(app, MUIA_Application_Sleep, TRUE, TAG_DONE);
             r = id == ID_OPEN ? app_ask_file(a, w) : app_ask_folder(a, w);
             SetAttrs(app, MUIA_Application_Sleep, FALSE, TAG_DONE);
@@ -225,7 +258,8 @@ int gui_mui(App *a)
             break;
         }
         case ID_POS:
-            if (app_playing(a)) app_play(a, getv(spos, MUIA_Numeric_Value) * 1000000UL);
+            stop_pos = getv(spos, MUIA_Numeric_Value) * 1000000UL;
+            if (app_playing(a)) app_play(a, stop_pos);
             show(a);
             break;
         case ID_TEMPO:
@@ -300,6 +334,7 @@ int gui_mui(App *a)
             else if (id == ID_CLOSE) app_close(a);
             else {
                 GetAttr(MUIA_Window_Window, win, (ULONG *)&w);
+                if (!w) w = tv_window();
                 app_save_as(a, w);
             }
             fill_list(a);
@@ -346,6 +381,7 @@ int gui_mui(App *a)
                 uint32_t t = (uint32_t)a->locate_us;
                 a->locate_us = -1;
                 if (app_playing(a)) app_play(a, t);
+                stop_pos = t;
                 SetAttrs(spos, MUIA_NoNotify, TRUE, MUIA_Numeric_Value, t / 1000000, TAG_DONE);
                 show(a);
             }

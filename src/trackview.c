@@ -37,6 +37,9 @@
 #include "mixer.h"
 #include "screen.h"
 #include "pal.h"
+#include "transport.h"
+#include "lyrwin.h"
+#include "lyredwin.h"
 #include <libraries/gadtools.h>
 
 extern struct Library *GadToolsBase;
@@ -98,7 +101,7 @@ unsigned long tv_signal(void) { return (vw ? 1UL << vw->UserPort->mp_SigBit : 0)
 static uint32_t bar_ticks(App *a)
 {
     uint32_t tk[64], num[64], bl[64];
-    ed_sigs(&a->ed, tk, num, bl, 64);
+    if (a->cur < 0 || ed_sigs(&a->ed, tk, num, bl, 64) < 1 || !num[0] || !bl[0]) return 1920;
     return num[0] * bl[0];
 }
 
@@ -133,6 +136,153 @@ static void cursor_xor(App *a);
 
 /* a colour of the PC Track View, else the screen's pen */
 static UWORD CP(int c, UWORD def) { return pal(cmap[c], def); }
+
+/* ---- the toolbar: the editors and the functions as icons (as the PC / web main window) ---- */
+enum { I_NEW, I_OPEN, I_SAVE, I_SAVEAS, I_SONGS, I_UNDO, I_LIST, I_ROLL, I_STAFF, I_DRUM, I_MIXER, I_XGM, I_LYRICS, I_LYRED,
+       I_TEXTS, I_JOBS, I_TRANSPORT, I_N };
+static const char *const ILABEL[I_N] = {"New", "Open", "Save", "As..", "Songs", "Undo", "List", "Roll", "Staff", "Drum", "Mixer",
+                                        "XGM", "Lyric", "LyrEd", "Texts", "Jobs", "Trans"};
+static const char *const ITIP[I_N] = {"New song", "Open a song...", "Save the song", "Save as... (.MID / .XWS)", "Songs: the list, tempo, transpose, reset, output, screen",
+                                      "Undo", "Event List of the selected track", "Piano Roll", "Staff (notation)", "Drum editor", "Mixer",
+                                      "XGM: sound / bank of the track's part", "Lyrics / Karaoke", "Lyrics editor", "Texts: lyrics and chords tools",
+                                      "Jobs: transpose, quantize, demix ...", "Transport: play, locators, loop"};
+static WORD tbx0, tby0, tbw = 38, tbh;
+
+static void line(struct RastPort *rp, WORD x0, WORD y0, WORD x1, WORD y1) { Move(rp, x0, y0); Draw(rp, x1, y1); }
+static void box(struct RastPort *rp, WORD x0, WORD y0, WORD x1, WORD y1) { Move(rp, x0, y0); Draw(rp, x1, y0); Draw(rp, x1, y1); Draw(rp, x0, y1); Draw(rp, x0, y0); }
+
+/* one icon, 22 x 14 at (x, y) */
+static void draw_icon(struct RastPort *rp, int id, WORD x, WORD y)
+{
+    UWORD black = CP(C_BLACK, pen_tx), white = CP(C_WHITE, pen_sh), blue = pal(PAL_NOTE, pen_fill), red = pal(PAL_RED, pen_tx),
+          yellow = pal(PAL_K_HAT, pen_fill), grey = pal(PAL_EDGE, pen_tx), green = pal(PAL_K_PERC, pen_fill), light = pal(PAL_LIGHT, pen_bg);
+    int k;
+    switch (id) {
+    case I_NEW:
+        SetAPen(rp, white); RectFill(rp, x + 6, y, x + 15, y + 13);
+        SetAPen(rp, black); Move(rp, x + 6, y); Draw(rp, x + 12, y); Draw(rp, x + 15, y + 3); Draw(rp, x + 15, y + 13); Draw(rp, x + 6, y + 13); Draw(rp, x + 6, y);
+        line(rp, x + 12, y, x + 12, y + 3); line(rp, x + 12, y + 3, x + 15, y + 3);
+        break;
+    case I_OPEN:
+        SetAPen(rp, yellow); RectFill(rp, x + 3, y + 4, x + 18, y + 13);
+        SetAPen(rp, black); box(rp, x + 3, y + 3, x + 18, y + 13); line(rp, x + 3, y + 3, x + 6, y + 1); line(rp, x + 6, y + 1, x + 10, y + 1); line(rp, x + 10, y + 1, x + 11, y + 3);
+        break;
+    case I_SAVE: case I_SAVEAS:
+        SetAPen(rp, blue); RectFill(rp, x + 4, y, x + 17, y + 13);
+        SetAPen(rp, white); RectFill(rp, x + 7, y + 1, x + 14, y + 5);
+        SetAPen(rp, light); RectFill(rp, x + 7, y + 8, x + 14, y + 13);
+        SetAPen(rp, black); box(rp, x + 4, y, x + 17, y + 13);
+        if (id == I_SAVEAS) { SetAPen(rp, red); RectFill(rp, x + 16, y + 9, x + 21, y + 13); }
+        break;
+    case I_SONGS:
+        SetAPen(rp, white); RectFill(rp, x + 2, y, x + 19, y + 13);
+        SetAPen(rp, black); box(rp, x + 2, y, x + 19, y + 13);
+        for (k = 0; k < 4; k++) { SetAPen(rp, k == 1 ? blue : black); line(rp, x + 5, y + 3 + k * 3, x + 16, y + 3 + k * 3); }
+        break;
+    case I_UNDO:
+        SetAPen(rp, blue);
+        line(rp, x + 6, y + 4, x + 15, y + 4); line(rp, x + 6, y + 5, x + 15, y + 5);
+        line(rp, x + 15, y + 4, x + 18, y + 7); line(rp, x + 18, y + 7, x + 18, y + 10); line(rp, x + 18, y + 10, x + 15, y + 13);
+        line(rp, x + 16, y + 4, x + 19, y + 7); line(rp, x + 19, y + 7, x + 19, y + 10);
+        for (k = 0; k < 4; k++) line(rp, x + 3 + k, y + 4 - k, x + 3 + k, y + 5 + k);
+        break;
+    case I_LIST:
+        SetAPen(rp, white); RectFill(rp, x + 2, y, x + 19, y + 13);
+        SetAPen(rp, black); box(rp, x + 2, y, x + 19, y + 13);
+        for (k = 0; k < 4; k++) { line(rp, x + 4, y + 3 + k * 3, x + 8, y + 3 + k * 3); line(rp, x + 10, y + 3 + k * 3, x + 17, y + 3 + k * 3); }
+        break;
+    case I_ROLL:
+        SetAPen(rp, white); RectFill(rp, x + 2, y, x + 19, y + 13);
+        SetAPen(rp, black); box(rp, x + 2, y, x + 19, y + 13); RectFill(rp, x + 2, y + 2, x + 5, y + 3); RectFill(rp, x + 2, y + 8, x + 5, y + 9);
+        SetAPen(rp, blue); RectFill(rp, x + 7, y + 2, x + 12, y + 3); RectFill(rp, x + 11, y + 6, x + 17, y + 7); RectFill(rp, x + 8, y + 10, x + 14, y + 11);
+        break;
+    case I_STAFF:
+        SetAPen(rp, black);
+        for (k = 0; k < 5; k++) line(rp, x + 1, y + 2 + k * 2, x + 20, y + 2 + k * 2);
+        RectFill(rp, x + 8, y + 7, x + 11, y + 9); line(rp, x + 11, y, x + 11, y + 8);
+        RectFill(rp, x + 14, y + 5, x + 17, y + 7); line(rp, x + 17, y, x + 17, y + 6); line(rp, x + 11, y, x + 17, y);
+        break;
+    case I_DRUM:
+        SetAPen(rp, red); RectFill(rp, x + 4, y + 5, x + 17, y + 12);
+        SetAPen(rp, white); RectFill(rp, x + 4, y + 3, x + 17, y + 5);
+        SetAPen(rp, black); box(rp, x + 4, y + 3, x + 17, y + 12); line(rp, x + 4, y + 5, x + 17, y + 5);
+        line(rp, x + 2, y, x + 8, y + 3); line(rp, x + 19, y, x + 13, y + 3);
+        break;
+    case I_MIXER:
+        SetAPen(rp, black);
+        for (k = 0; k < 4; k++) line(rp, x + 4 + k * 5, y, x + 4 + k * 5, y + 13);
+        SetAPen(rp, grey);
+        for (k = 0; k < 4; k++) RectFill(rp, x + 2 + k * 5, y + (k == 0 ? 3 : k == 1 ? 8 : k == 2 ? 5 : 10), x + 6 + k * 5, y + (k == 0 ? 5 : k == 1 ? 10 : k == 2 ? 7 : 12));
+        break;
+    case I_XGM:
+        SetAPen(rp, green); RectFill(rp, x + 1, y + 1, x + 20, y + 12);
+        SetAPen(rp, black); box(rp, x + 1, y + 1, x + 20, y + 12);
+        SetAPen(rp, white);
+        line(rp, x + 4, y + 3, x + 9, y + 10); line(rp, x + 9, y + 3, x + 4, y + 10);
+        line(rp, x + 17, y + 3, x + 12, y + 3); line(rp, x + 12, y + 3, x + 12, y + 10); line(rp, x + 12, y + 10, x + 17, y + 10); line(rp, x + 17, y + 10, x + 17, y + 7); line(rp, x + 17, y + 7, x + 15, y + 7);
+        break;
+    case I_LYRICS: case I_LYRED:
+        SetAPen(rp, pal(PAL_LANE, pen_tx)); RectFill(rp, x + 1, y + 1, x + 20, y + 12);
+        SetAPen(rp, yellow); line(rp, x + 3, y + 5, x + 18, y + 5); line(rp, x + 3, y + 9, x + 12, y + 9);
+        SetAPen(rp, white); line(rp, x + 12, y + 9, x + 18, y + 9);
+        if (id == I_LYRED) { SetAPen(rp, red); for (k = 0; k < 3; k++) line(rp, x + 12 + k, y + 13, x + 20 + k, y + 4); }
+        break;
+    case I_TEXTS:
+        SetAPen(rp, black); RectFill(rp, x + 5, y + 1, x + 16, y + 2); RectFill(rp, x + 10, y + 1, x + 11, y + 13);
+        SetAPen(rp, blue); RectFill(rp, x + 14, y + 8, x + 16, y + 10); line(rp, x + 16, y + 3, x + 16, y + 9);
+        break;
+    case I_JOBS:
+        SetAPen(rp, grey); RectFill(rp, x + 3, y + 1, x + 12, y + 5);
+        SetAPen(rp, pal(PAL_K_HAT, pen_tx)); for (k = 0; k < 3; k++) line(rp, x + 7 + k, y + 5, x + 15 + k, y + 13);
+        SetAPen(rp, black); box(rp, x + 3, y + 1, x + 12, y + 5);
+        break;
+    case I_TRANSPORT:
+        SetAPen(rp, black); RectFill(rp, x + 1, y + 1, x + 20, y + 12);
+        SetAPen(rp, green);
+        for (k = 0; k < 6; k++) line(rp, x + 5 + k, y + 3 + k / 2, x + 5 + k, y + 10 - k / 2);
+        RectFill(rp, x + 13, y + 4, x + 17, y + 9);
+        break;
+    }
+}
+
+static void draw_toolbar(void)
+{
+    struct RastPort *rp;
+    int i;
+    if (!vw) return;
+    rp = vw->RPort;
+    SetDrMd(rp, JAM1);
+    SetAPen(rp, pal(PAL_LIGHT, pen_bg));
+    RectFill(rp, vw->BorderLeft, tby0, (WORD)(vw->Width - vw->BorderRight - 1), (WORD)(tby0 + tbh - 1));
+    if (vmono) SetFont(rp, vmono);
+    for (i = 0; i < I_N; i++) {
+        WORD x = (WORD)(tbx0 + i * tbw + (i >= I_SONGS) * 4 + (i >= I_UNDO) * 4 + (i >= I_LIST) * 6 + (i >= I_TRANSPORT) * 6);
+        const char *l = ILABEL[i];
+        if (x + tbw > vw->Width - vw->BorderRight) break;
+        /* the button: raised */
+        SetAPen(rp, CP(C_WHITE, pen_sh)); Move(rp, x, (WORD)(tby0 + tbh - 2)); Draw(rp, x, (WORD)(tby0 + 1)); Draw(rp, (WORD)(x + tbw - 2), (WORD)(tby0 + 1));
+        SetAPen(rp, pal(PAL_EDGE, pen_tx)); Draw(rp, (WORD)(x + tbw - 2), (WORD)(tby0 + tbh - 2)); Draw(rp, x, (WORD)(tby0 + tbh - 2));
+        draw_icon(rp, i, (WORD)(x + (tbw - 22) / 2), (WORD)(tby0 + 3));
+        SetAPen(rp, CP(C_BLACK, pen_tx));
+        Move(rp, (WORD)(x + (tbw - 1 - TextLength(rp, (CONST_STRPTR)l, strlen(l))) / 2), (WORD)(tby0 + tbh - 3 - rp->TxHeight + rp->TxBaseline));
+        Text(rp, (CONST_STRPTR)l, strlen(l));
+    }
+    SetFont(rp, vw->WScreen->RastPort.Font);
+}
+
+/* the button at x (-1 = none) */
+static int toolbar_hit(WORD mx)
+{
+    int i;
+    for (i = 0; i < I_N; i++) {
+        WORD x = (WORD)(tbx0 + i * tbw + (i >= I_SONGS) * 4 + (i >= I_UNDO) * 4 + (i >= I_LIST) * 6 + (i >= I_TRANSPORT) * 6);
+        if (mx >= x && mx < x + tbw - 1) return i;
+    }
+    return -1;
+}
+
+struct Window *tv_window(void) { return vw; }
+
 
 static void draw(App *a)
 {
@@ -275,6 +425,12 @@ static void cursor_xor(App *a)
 void tv_position(App *a, uint32_t pos_us, int playing)
 {
     uint32_t t, bar;
+    static char last_info[120];
+    /* the program's messages on the info line (the main window's) */
+    if (vw && strcmp(last_info, a->info)) {
+        snprintf(last_info, sizeof last_info, "%s", a->info);
+        info(a->info);
+    }
     if (!vw || a->cur < 0 || drag) return;
     t = xg_us_tick(&a->song, pos_us);
     if (t == cur_tick) return;
@@ -322,8 +478,7 @@ int tv_open(App *a)
     struct Gadget *g;
     struct DrawInfo *dri;
     WORD fh, x, y;
-    if (a->cur < 0) { snprintf(a->info, sizeof a->info, "Load a song first."); return 0; }
-    if (vw) { WindowToFront(vw); ActivateWindow(vw); draw(a); return 1; }
+    if (vw) { WindowToFront(vw); ActivateWindow(vw); draw(a); draw_toolbar(); return 1; }
     if (!(scr = LockPubScreen((CONST_STRPTR)scr_pubname()))) return 0;
     if ((dri = GetScreenDrawInfo(scr))) {
         pen_bg = dri->dri_Pens[BACKGROUNDPEN]; pen_tx = dri->dri_Pens[SHADOWPEN];
@@ -338,7 +493,11 @@ int tv_open(App *a)
         ta.ta_Name = (STRPTR)"topaz.font"; ta.ta_YSize = 8; ta.ta_Style = 0; ta.ta_Flags = 0;
         if (!vmono) vmono = OpenFont(&ta);
     }
-    y = (WORD)(scr->WBorTop + fh + 1 + 2);
+    /* the toolbar band, then the gadget rows */
+    tbx0 = (WORD)(scr->WBorLeft + 2);
+    tby0 = (WORD)(scr->WBorTop + fh + 1 + 1);
+    tbh = (WORD)(3 + 14 + 2 + 8 + 4);
+    y = (WORD)(tby0 + tbh + 2);
     memset(&ng, 0, sizeof ng);
     ng.ng_TextAttr = scr->Font;
     ng.ng_VisualInfo = vvi;
@@ -385,8 +544,10 @@ int tv_open(App *a)
     }
     tb = (WORD)(y + fh + 7);
     if (!g) { FreeGadgets(vgl); vgl = NULL; FreeVisualInfo(vvi); UnlockPubScreen(NULL, scr); pal_close(); return 0; }
-    vw = OpenWindowTags(NULL, WA_Title, (ULONG)"Track View", WA_Left, 0, WA_Top, scr->BarHeight + 1,
-        WA_Width, scr->Width > 700 ? 680 : scr->Width, WA_Height, scr->Height - scr->BarHeight - 1 > 360 ? 360 : scr->Height - scr->BarHeight - 1,
+    /* the main window: the screen's width (up to 720), down to the Transport */
+    vw = OpenWindowTags(NULL, WA_Title, (ULONG)"XGWorks Lite - Track View", WA_Left, 0, WA_Top, scr->BarHeight + 1,
+        WA_Width, scr->Width > 720 ? 720 : scr->Width,
+        WA_Height, scr->Height - scr->BarHeight - 1 - (scr->Height > 300 ? 120 : 0) > 200 ? scr->Height - scr->BarHeight - 1 - (scr->Height > 300 ? 120 : 0) : scr->Height - scr->BarHeight - 1,
         WA_MinWidth, 600, WA_MinHeight, 140, WA_MaxWidth, ~0, WA_MaxHeight, ~0,
         WA_Gadgets, (ULONG)vgl, WA_DragBar, TRUE, WA_DepthGadget, TRUE, WA_CloseGadget, TRUE, WA_SizeGadget, TRUE,
         WA_SizeBBottom, TRUE, WA_SizeBRight, TRUE, WA_Activate, TRUE, WA_SimpleRefresh, TRUE, WA_NewLookMenus, TRUE, WA_PubScreen, (ULONG)scr,
@@ -414,8 +575,10 @@ int tv_open(App *a)
     htop = 0;
     ttop = 0;
     nsel = 0;
-    vtrk = edw_selected_track();
+    vtrk = a->cur >= 0 ? edw_selected_track() : -1;
     draw(a);
+    draw_toolbar();
+    info(a->info[0] ? a->info : "Open a song (Open / Songs). Click a track's Sound for its program / bank.");
     return 1;
 }
 
@@ -445,7 +608,7 @@ void tv_close(void)
 void tv_refresh(App *a)
 {
     if (!vw) return;
-    if (a->cur < 0) { tv_close(); return; }
+    if (a->cur < 0) { nsel = 0; vtrk = -1; draw(a); draw_toolbar(); return; }
     if (vtrk >= (int)a->ed.ntrk) vtrk = -1;
     nsel = 0;
     draw(a);
@@ -685,9 +848,9 @@ int tv_handle(App *a)
         }
         GT_ReplyIMsg(m);
         switch (cls) {
-        case IDCMP_CLOSEWINDOW: close = 1; break;
-        case IDCMP_REFRESHWINDOW: GT_BeginRefresh(vw); GT_EndRefresh(vw, TRUE); draw(a); break;
-        case IDCMP_NEWSIZE: draw(a); break;
+        case IDCMP_CLOSEWINDOW: a->want_cmd = CMD_QUIT; break;
+        case IDCMP_REFRESHWINDOW: GT_BeginRefresh(vw); GT_EndRefresh(vw, TRUE); draw(a); draw_toolbar(); break;
+        case IDCMP_NEWSIZE: draw(a); draw_toolbar(); break;
         case IDCMP_MENUPICK: {
             UWORD c = code;
             while (c != MENUNULL && vmenu) {
@@ -806,6 +969,34 @@ int tv_handle(App *a)
             draw(a);
             break;
         case IDCMP_MOUSEBUTTONS:
+            if (code == SELECTDOWN && my >= tby0 && my < tby0 + tbh) {
+                int ib = toolbar_hit(mx);
+                if (ib >= 0) {
+                    info(ITIP[ib]);
+                    if (vtrk >= 0 && a->cur >= 0) edw_select_track(a, vtrk);
+                    switch (ib) {
+                    case I_NEW: a->want_cmd = CMD_NEW; break;
+                    case I_OPEN: a->want_cmd = CMD_OPEN; break;
+                    case I_SAVE: a->want_cmd = CMD_SAVE; break;
+                    case I_SAVEAS: a->want_cmd = CMD_SAVEAS; break;
+                    case I_SONGS: a->want_cmd = CMD_SONGS; break;
+                    case I_UNDO: if (a->cur >= 0) { app_undo(a); info(a->info); nsel = 0; changed = 1; } break;
+                    case I_LIST: if (vtrk >= 0) menu_pick(a, M_LIST); else edw_tracks_open(a); break;
+                    case I_ROLL: menu_pick(a, M_ROLL); break;
+                    case I_STAFF: menu_pick(a, M_STAFF); break;
+                    case I_DRUM: menu_pick(a, M_DRUMS); break;
+                    case I_MIXER: a->want_mixer = 1; break;
+                    case I_XGM: menu_pick(a, M_XGM); break;
+                    case I_LYRICS: menu_pick(a, M_LYRICS); break;
+                    case I_LYRED: yw_open(a); break;
+                    case I_TEXTS: lw_open(a); break;
+                    case I_JOBS: menu_pick(a, M_JOBS); break;
+                    case I_TRANSPORT: if (tr_is_open()) tr_close(); else tr_open(a); break;
+                    }
+                    if (a->cur < 0 && ib >= I_UNDO && ib != I_TRANSPORT && ib != I_MIXER) info("Load a song first: Open or Songs.");
+                }
+                break;
+            }
             if (code == SELECTDOWN && my >= gy0 && my <= gy1) {
                 int r = (my - gy0) / rh + ttop, nb, k, hit = -1;
                 static EdBlock blks[256];
@@ -887,7 +1078,7 @@ int tv_handle(App *a)
                 app_ed_commit(a);
                 changed = 1;
                 draw(a);
-            } else if (code == 0x45) close = 1;   /* Esc */
+            }
             break;
         }
     }

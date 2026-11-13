@@ -331,6 +331,9 @@ int app_load(App *a, int k)
     }
     mx_from_song(&a->mx, &a->song);
     app_names_std(a);
+    /* the locators: bar 1 and bar 5 */
+    a->loc_l = 0;
+    a->loc_r = ed_tick_of(&a->ed, 5, 1, 0);
     ly_build(&a->ly, &a->song, a->letters);
     a->len_us = a->song.nev ? xg_tick_us(&a->song, a->song.ev[a->song.nev - 1].tick) : 0;
     {

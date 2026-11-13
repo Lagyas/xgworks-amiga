@@ -8,7 +8,7 @@ CFLAGS  = -m68020 -O2 -noixemul -Wall -Wno-pointer-sign -fomit-frame-pointer
 SRC     = src/xgplay.c src/smf.c
 HOSTCC  ?= cc
 
-LITE    = src/main.c src/app.c src/player.c src/mixer.c src/fx.c src/xws.c src/gui_mui.c src/gui_gadtools.c src/mixwin_mui.c src/mixwin_gt.c src/karawin.c src/edwin.c src/pianoroll.c src/rollops.c src/drumwin.c src/drumops.c src/lyrwin.c src/lyrtools.c src/editors.c src/xgmwin.c src/voices.c src/lyredwin.c src/staffwin.c src/jobwin.c src/jobs.c src/trackview.c src/screen.c src/pal.c src/blocks.c src/xwswrite.c src/edit.c src/edtext.c src/lyrics.c src/textmap.c src/textmap_data.c src/smf.c src/midiout_amiga.c
+LITE    = src/main.c src/app.c src/player.c src/mixer.c src/fx.c src/xws.c src/gui_mui.c src/gui_gadtools.c src/mixwin_mui.c src/mixwin_gt.c src/karawin.c src/edwin.c src/pianoroll.c src/rollops.c src/drumwin.c src/drumops.c src/lyrwin.c src/lyrtools.c src/editors.c src/xgmwin.c src/voices.c src/lyredwin.c src/staffwin.c src/jobwin.c src/jobs.c src/trackview.c src/transport.c src/screen.c src/pal.c src/blocks.c src/xwswrite.c src/edit.c src/edtext.c src/lyrics.c src/textmap.c src/textmap_data.c src/smf.c src/midiout_amiga.c
 
 all: XGPlay XGWorksLite VxDump
 

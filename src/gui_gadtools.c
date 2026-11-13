@@ -29,6 +29,7 @@
 #include "staffwin.h"
 #include "jobwin.h"
 #include "trackview.h"
+#include "transport.h"
 #include "screen.h"
 
 struct Library *GadToolsBase;
@@ -99,18 +100,176 @@ static void start(App *a, int k, uint32_t from)
     show(a);
 }
 
+static struct Gadget *glist;
+static void *gvi;
+static WORD win_iw, win_ih;
+static int sel = -1, running = 1;
+static ULONG secs0, mics0;
+
+/* the window for the requesters: the Songs window, else the Track View */
+static struct Window *req_window(void) { return win ? win : tv_window(); }
+
+/* the Songs window (the list, Position, Tempo, Transpose, Reset, Output, Screen) */
+static void open_main(App *a)
+{
+    struct Screen *scr;
+    if (win) { WindowToFront(win); ActivateWindow(win); return; }
+    if (!(scr = LockPubScreen((CONST_STRPTR)scr_pubname()))) return;
+    win = OpenWindowTags(NULL,
+        WA_Title, (ULONG)"XGWorks Lite - Songs",
+        WA_InnerWidth, win_iw, WA_InnerHeight, win_ih,
+        WA_Left, 40, WA_Top, 30,
+        WA_Gadgets, (ULONG)glist,
+        WA_DragBar, TRUE, WA_DepthGadget, TRUE, WA_CloseGadget, TRUE, WA_Activate, TRUE,
+        WA_PubScreen, (ULONG)scr,
+        WA_IDCMP, IDCMP_CLOSEWINDOW | IDCMP_REFRESHWINDOW | IDCMP_VANILLAKEY | IDCMP_RAWKEY | LISTVIEWIDCMP | SLIDERIDCMP | BUTTONIDCMP | CYCLEIDCMP,
+        TAG_DONE);
+    UnlockPubScreen(NULL, scr);
+    if (!win) return;
+    GT_RefreshWindow(win, NULL);
+    if (a->cur >= 0) set(G_LIST, GTLV_Selected, a->cur);
+}
+
+static void close_main(void)
+{
+    if (!win) return;
+    /* the gadgets stay (they are opened again with the window) */
+    RemoveGList(win, glist, -1);
+    CloseWindow(win);
+    win = NULL;
+}
+
+/* a gadget of the Songs window (also asked for by the Track View / Transport) */
+static void gadget(App *a, int gid, ULONG cls, UWORD code, ULONG secs, ULONG mics)
+{
+        switch (gid) {
+        case G_LIST:
+            if (cls != IDCMP_GADGETUP) break;
+            /* a double click plays */
+            if ((int)code == sel && DoubleClick(secs0, mics0, secs, mics)) start(a, sel, 0);
+            sel = code;
+            secs0 = secs; mics0 = mics;
+            break;
+        case G_PLAY: {
+            int k = sel >= 0 ? sel : (a->cur >= 0 ? a->cur : 0);
+            start(a, k, k == a->cur ? shown_pos : 0);
+            break;
+        }
+        case G_STOP:
+            app_stop(a);
+            show(a);
+            break;
+        case G_MIX:
+            mixgt_open(a);
+            break;
+        case G_LYR:
+            kw_open(a);
+            break;
+        case G_TRK:
+            edw_tracks_open(a);
+            show(a);
+            break;
+        case G_ROLL:
+            pr_open(a);
+            show(a);
+            break;
+        case G_DRUMS:
+            dw_open(a);
+            show(a);
+            break;
+        case G_TEXTS:
+            lw_open(a);
+            show(a);
+            break;
+        case G_XGM:
+            xw_open(a);
+            break;
+        case G_LYRED:
+            yw_open(a);
+            show(a);
+            break;
+        case G_STAFF:
+            sw_open(a);
+            show(a);
+            break;
+        case G_JOBS:
+            jw_open(a);
+            show(a);
+            break;
+        case G_TV:
+            tv_open(a);
+            show(a);
+            break;
+        case G_NEW:
+        case G_CLOSE:
+        case G_SAVEAS:
+            app_stop(a);
+            if (gid == G_NEW) app_new(a);
+            else if (gid == G_CLOSE) app_close(a);
+            else app_save_as(a, req_window());
+            fill_list(a);
+            sel = a->cur;
+            if (a->cur >= 0) set(G_LIST, GTLV_Selected, a->cur);
+            shown_pos = 0;
+            set(G_POS, GTSL_Max, a->len_us / 1000000 + 1);
+            set(G_POS, GTSL_Level, 0);
+            mixgt_refresh(a);
+            eds_refresh(a);
+            kw_update(a, 0, 1);
+            show(a);
+            break;
+        case G_PREV:
+        case G_NEXT: {
+            int k = a->cur + (gid == G_NEXT ? 1 : -1);
+            if (k >= 0 && k < a->count) { sel = k; start(a, k, 0); }
+            break;
+        }
+        case G_OPEN:
+        case G_FOLDER: {
+            int r = gid == G_OPEN ? app_ask_file(a, req_window()) : app_ask_folder(a, req_window());
+            if (r) { fill_list(a); sel = -1; }
+            if (r >= 2) { sel = r - 2; start(a, sel, 0); }
+            show(a);
+            break;
+        }
+        case G_POS:
+            shown_pos = (uint32_t)code * 1000000UL;
+            if (cls == IDCMP_GADGETUP && app_playing(a)) app_play(a, shown_pos);
+            show(a);
+            break;
+        case G_TEMPO:
+            app_set_tempo(a, (WORD)code);
+            break;
+        case G_TRANS:
+            app_set_transpose(a, (WORD)code);
+            break;
+        case G_RESET:
+            a->reset = code;
+            app_names_std(a);
+            eds_refresh(a);
+            mixgt_refresh(a);
+            break;
+        case G_OUT:
+            a->output = code;
+            break;
+        case G_SCREEN:
+            a->screen = code;
+            app_save_prefs(a);
+            snprintf(a->info, sizeof a->info, "%s", code ? "Screen: on the next start XGWorks Lite opens its own screen with these colours." : "Screen: on the next start on the Workbench.");
+            show(a);
+            break;
+        }
+}
+
 int gui_gadtools(App *a)
 {
     struct Screen *scr;
-    void *vi;
-    struct Gadget *glist = NULL, *g;
+    struct Gadget *g;
     struct NewGadget ng;
     WORD fh, top, x0, w, y, bh, lh;
-    int running = 1, sel = -1;
-    ULONG secs0 = 0, mics0 = 0;
     if (!(GadToolsBase = OpenLibrary((CONST_STRPTR)"gadtools.library", 39))) return -1;
     if (!(scr = LockPubScreen((CONST_STRPTR)scr_pubname()))) { CloseLibrary(GadToolsBase); return -1; }
-    vi = GetVisualInfo(scr, TAG_DONE);
+    gvi = GetVisualInfo(scr, TAG_DONE);
     fh = scr->Font->ta_YSize;
     top = scr->WBorTop + fh + 1 + 4;
     x0 = scr->WBorLeft + 8;
@@ -122,7 +281,7 @@ int gui_gadtools(App *a)
     g = CreateContext(&glist);
     memset(&ng, 0, sizeof ng);
     ng.ng_TextAttr = scr->Font;
-    ng.ng_VisualInfo = vi;
+    ng.ng_VisualInfo = gvi;
 
     y = top;
     ng.ng_LeftEdge = x0; ng.ng_TopEdge = y; ng.ng_Width = w; ng.ng_Height = lh;
@@ -178,32 +337,22 @@ int gui_gadtools(App *a)
 
     if (!g) {
         FreeGadgets(glist);
-        FreeVisualInfo(vi);
+        FreeVisualInfo(gvi);
         UnlockPubScreen(NULL, scr);
         return -1;
     }
-    win = OpenWindowTags(NULL,
-        WA_Title, (ULONG)"XGWorks Lite",
-        WA_InnerWidth, w + 16, WA_InnerHeight, y - scr->WBorTop - fh - 1 + 2,
-        WA_Left, 40, WA_Top, 30,
-        WA_Gadgets, (ULONG)glist,
-        WA_DragBar, TRUE, WA_DepthGadget, TRUE, WA_CloseGadget, TRUE, WA_Activate, TRUE,
-        WA_PubScreen, (ULONG)scr,
-        WA_IDCMP, IDCMP_CLOSEWINDOW | IDCMP_REFRESHWINDOW | IDCMP_VANILLAKEY | IDCMP_RAWKEY | LISTVIEWIDCMP | SLIDERIDCMP | BUTTONIDCMP | CYCLEIDCMP,
-        TAG_DONE);
+    win_iw = (WORD)(w + 16);
+    win_ih = (WORD)(y - scr->WBorTop - fh - 1 + 2);
     UnlockPubScreen(NULL, scr);
-    if (!win) {
-        FreeGadgets(glist);
-        FreeVisualInfo(vi);
-        return -1;
-    }
-    GT_RefreshWindow(win, NULL);
     fill_list(a);
+    /* the main window: the Track View (as the web / PC version), and the Transport */
+    if (!tv_open(a)) open_main(a);
+    tr_open(a);
     show(a);
 
     while (running) {
         struct IntuiMessage *m;
-        ULONG sigs = Wait((1UL << win->UserPort->mp_SigBit) | pl_signal() | mixgt_signal() | kw_signal() | eds_signal() | SIGBREAKF_CTRL_C);
+        ULONG sigs = Wait((win ? 1UL << win->UserPort->mp_SigBit : 0) | pl_signal() | mixgt_signal() | kw_signal() | eds_signal() | SIGBREAKF_CTRL_C);
         if (sigs & eds_signal()) {
             if (eds_handle(a, sigs)) {
                 mixgt_refresh(a);
@@ -221,6 +370,29 @@ int gui_gadtools(App *a)
             show(a);
         }
         if (a->want_mixer) { a->want_mixer = 0; mixgt_open(a); }
+        if (a->want_cmd) {
+            /* a command of the Track View / Transport */
+            int cmd = a->want_cmd;
+            a->want_cmd = CMD_NONE;
+            switch (cmd) {
+            case CMD_NEW: gadget(a, G_NEW, IDCMP_GADGETUP, 0, 0, 0); break;
+            case CMD_OPEN: gadget(a, G_OPEN, IDCMP_GADGETUP, 0, 0, 0); break;
+            case CMD_FOLDER: gadget(a, G_FOLDER, IDCMP_GADGETUP, 0, 0, 0); break;
+            case CMD_SAVEAS: gadget(a, G_SAVEAS, IDCMP_GADGETUP, 0, 0, 0); break;
+            case CMD_CLOSE: gadget(a, G_CLOSE, IDCMP_GADGETUP, 0, 0, 0); break;
+            case CMD_SAVE: if (a->cur >= 0) app_save(a); else snprintf(a->info, sizeof a->info, "No song to save."); show(a); break;
+            case CMD_SONGS: open_main(a); break;
+            case CMD_PLAY: {
+                int k = a->cur >= 0 ? a->cur : sel >= 0 ? sel : 0;
+                if (k < a->count) start(a, k, k == a->cur ? shown_pos : 0);
+                else snprintf(a->info, sizeof a->info, "No songs: Open or Songs.");
+                show(a);
+                break;
+            }
+            case CMD_STOP: app_stop(a); show(a); break;
+            case CMD_QUIT: running = 0; break;
+            }
+        }
         if (a->locate_us >= 0) {
             /* a window moved the song position */
             uint32_t t = (uint32_t)a->locate_us;
@@ -240,14 +412,14 @@ int gui_gadtools(App *a)
             if (app_poll(a) && a->autonext && a->cur + 1 < a->count) start(a, a->cur + 1, 0);
             else show(a);
         }
-        while (running && (m = GT_GetIMsg(win->UserPort))) {
+        while (running && win && (m = GT_GetIMsg(win->UserPort))) {
             ULONG cls = m->Class, secs = m->Seconds, mics = m->Micros;
             UWORD code = m->Code;
             struct Gadget *src = (struct Gadget *)m->IAddress;
             GT_ReplyIMsg(m);
             switch (cls) {
             case IDCMP_CLOSEWINDOW:
-                running = 0;
+                close_main();
                 break;
             case IDCMP_REFRESHWINDOW:
                 GT_BeginRefresh(win);
@@ -259,126 +431,11 @@ int gui_gadtools(App *a)
             case IDCMP_VANILLAKEY:
                 if (code == 'p' || code == 'P' || code == ' ') start(a, sel >= 0 ? sel : (a->cur >= 0 ? a->cur : 0), sel == a->cur || sel < 0 ? shown_pos : 0);
                 else if (code == 's' || code == 'S') { app_stop(a); show(a); }
-                else if (code == 27) running = 0;
+                else if (code == 27) close_main();
                 break;
             case IDCMP_MOUSEMOVE:
             case IDCMP_GADGETUP:
-                switch (src->GadgetID) {
-                case G_LIST:
-                    if (cls != IDCMP_GADGETUP) break;
-                    /* a double click plays */
-                    if ((int)code == sel && DoubleClick(secs0, mics0, secs, mics)) start(a, sel, 0);
-                    sel = code;
-                    secs0 = secs; mics0 = mics;
-                    break;
-                case G_PLAY: {
-                    int k = sel >= 0 ? sel : (a->cur >= 0 ? a->cur : 0);
-                    start(a, k, k == a->cur ? shown_pos : 0);
-                    break;
-                }
-                case G_STOP:
-                    app_stop(a);
-                    show(a);
-                    break;
-                case G_MIX:
-                    mixgt_open(a);
-                    break;
-                case G_LYR:
-                    kw_open(a);
-                    break;
-                case G_TRK:
-                    edw_tracks_open(a);
-                    show(a);
-                    break;
-                case G_ROLL:
-                    pr_open(a);
-                    show(a);
-                    break;
-                case G_DRUMS:
-                    dw_open(a);
-                    show(a);
-                    break;
-                case G_TEXTS:
-                    lw_open(a);
-                    show(a);
-                    break;
-                case G_XGM:
-                    xw_open(a);
-                    break;
-                case G_LYRED:
-                    yw_open(a);
-                    show(a);
-                    break;
-                case G_STAFF:
-                    sw_open(a);
-                    show(a);
-                    break;
-                case G_JOBS:
-                    jw_open(a);
-                    show(a);
-                    break;
-                case G_TV:
-                    tv_open(a);
-                    show(a);
-                    break;
-                case G_NEW:
-                case G_CLOSE:
-                case G_SAVEAS:
-                    app_stop(a);
-                    if (src->GadgetID == G_NEW) app_new(a);
-                    else if (src->GadgetID == G_CLOSE) app_close(a);
-                    else app_save_as(a, win);
-                    fill_list(a);
-                    sel = a->cur;
-                    if (a->cur >= 0) set(G_LIST, GTLV_Selected, a->cur);
-                    shown_pos = 0;
-                    set(G_POS, GTSL_Max, a->len_us / 1000000 + 1);
-                    set(G_POS, GTSL_Level, 0);
-                    mixgt_refresh(a);
-                    eds_refresh(a);
-                    kw_update(a, 0, 1);
-                    show(a);
-                    break;
-                case G_PREV:
-                case G_NEXT: {
-                    int k = a->cur + (src->GadgetID == G_NEXT ? 1 : -1);
-                    if (k >= 0 && k < a->count) { sel = k; start(a, k, 0); }
-                    break;
-                }
-                case G_OPEN:
-                case G_FOLDER: {
-                    int r = src->GadgetID == G_OPEN ? app_ask_file(a, win) : app_ask_folder(a, win);
-                    if (r) { fill_list(a); sel = -1; }
-                    if (r >= 2) { sel = r - 2; start(a, sel, 0); }
-                    show(a);
-                    break;
-                }
-                case G_POS:
-                    shown_pos = (uint32_t)code * 1000000UL;
-                    if (cls == IDCMP_GADGETUP && app_playing(a)) app_play(a, shown_pos);
-                    show(a);
-                    break;
-                case G_TEMPO:
-                    app_set_tempo(a, (WORD)code);
-                    break;
-                case G_TRANS:
-                    app_set_transpose(a, (WORD)code);
-                    break;
-                case G_RESET:
-                    a->reset = code;
-                    app_names_std(a);
-                    eds_refresh(a);
-                    mixgt_refresh(a);
-                    break;
-                case G_OUT:
-                    a->output = code;
-                    break;
-                case G_SCREEN:
-                    a->screen = code;
-                    app_save_prefs(a);
-                    snprintf(a->info, sizeof a->info, "%s", code ? "Screen: on the next start XGWorks Lite opens its own screen with these colours." : "Screen: on the next start on the Workbench.");
-                    show(a);
-                    break;
+                gadget(a, src->GadgetID, cls, code, secs, mics);
                 }
                 break;
             }
@@ -388,10 +445,9 @@ int gui_gadtools(App *a)
     mixgt_close();
     kw_close();
     eds_close();
-    CloseWindow(win);
-    win = NULL;
+    close_main();
     FreeGadgets(glist);
-    FreeVisualInfo(vi);
+    FreeVisualInfo(gvi);
     free(nodes);
     nodes = NULL;
     CloseLibrary(GadToolsBase);
