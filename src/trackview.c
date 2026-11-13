@@ -77,7 +77,8 @@ static int dm_by_note, dm_all;
 static App *dm_app;
 
 /* the Track menu (the right mouse button), as the web / PC version's track menu */
-enum { M_ROLL = 1, M_LIST, M_STAFF, M_DRUMS, M_LYRICS, M_MIXER, M_XGM, M_DEMIXCH, M_DEMIXNOTE, M_TRANSPOSE, M_JOBS };
+enum { M_ROLL = 1, M_LIST, M_STAFF, M_DRUMS, M_LYRICS, M_MIXER, M_XGM, M_DEMIXCH, M_DEMIXNOTE, M_TRANSPOSE, M_JOBS,
+       M_SETL, M_SETR, M_GOL, M_GOR, M_LOOP };
 static struct NewMenu nm[] = {
     {NM_TITLE, (STRPTR)"Track", NULL, 0, 0, NULL},
     {NM_ITEM, (STRPTR)"Piano Roll", (STRPTR)"R", 0, 0, (APTR)M_ROLL},
@@ -92,6 +93,12 @@ static struct NewMenu nm[] = {
     {NM_ITEM, (STRPTR)"Demix by Note...", NULL, 0, 0, (APTR)M_DEMIXNOTE},
     {NM_ITEM, (STRPTR)"Transpose...", (STRPTR)"T", 0, 0, (APTR)M_TRANSPOSE},
     {NM_ITEM, (STRPTR)"Jobs...", (STRPTR)"J", 0, 0, (APTR)M_JOBS},
+    {NM_TITLE, (STRPTR)"Locators", NULL, 0, 0, NULL},
+    {NM_ITEM, (STRPTR)"Set L here (the position)", (STRPTR)"1", 0, 0, (APTR)M_SETL},
+    {NM_ITEM, (STRPTR)"Set R here (the position)", (STRPTR)"2", 0, 0, (APTR)M_SETR},
+    {NM_ITEM, (STRPTR)"Go to L", NULL, 0, 0, (APTR)M_GOL},
+    {NM_ITEM, (STRPTR)"Go to R", NULL, 0, 0, (APTR)M_GOR},
+    {NM_ITEM, (STRPTR)"Loop L - R on / off", (STRPTR)"O", 0, 0, (APTR)M_LOOP},
     {NM_END, NULL, NULL, 0, 0, NULL},
 };
 
@@ -323,6 +330,26 @@ static void draw(App *a)
             Text(rp, (CONST_STRPTR)txt, strlen(txt));
         }
     }
+    /* the locators in the ruler: L / R lines with their letters, the loop between them */
+    if (a->cur >= 0) {
+        UWORD col = pal(PAL_SOLO, pen_sh);
+        WORD xl = xt(a, a->loc_l), xr = xt(a, a->loc_r);
+        if (a->loop_on && a->loc_r > a->loc_l) {
+            WORD x0 = xl < gx0 ? gx0 : xl, x1 = xr > gx1 ? gx1 : xr;
+            if (x1 > x0) { SetAPen(rp, col); RectFill(rp, x0, (WORD)(gy0 - 4), x1, (WORD)(gy0 - 2)); }
+        }
+        if (vmono) SetFont(rp, vmono);
+        SetAPen(rp, col);
+        if (xl >= gx0 && xl <= gx1) {
+            Move(rp, xl, tb); Draw(rp, xl, (WORD)(gy0 - 1));
+            if (xl + 9 < gx1) { Move(rp, (WORD)(xl + 2), (WORD)(tb + 1 + rp->TxBaseline)); Text(rp, (CONST_STRPTR)"L", 1); }
+        }
+        if (xr >= gx0 && xr <= gx1) {
+            Move(rp, xr, tb); Draw(rp, xr, (WORD)(gy0 - 1));
+            if (xr + 9 < gx1) { Move(rp, (WORD)(xr + 2), (WORD)(tb + 1 + rp->TxBaseline)); Text(rp, (CONST_STRPTR)"R", 1); }
+        }
+        SetFont(rp, vw->WScreen->RastPort.Font);
+    }
     /* the separator under the head */
     SetAPen(rp, CP(C_BLACK, pen_tx));
     Move(rp, cx0, (WORD)(gy0 - 1)); Draw(rp, gx1, (WORD)(gy0 - 1));
@@ -426,6 +453,12 @@ void tv_position(App *a, uint32_t pos_us, int playing)
 {
     uint32_t t, bar;
     static char last_info[120];
+    static uint32_t last_l = 0xFFFFFFFFUL, last_r;
+    static int last_loop = -1;
+    if (vw && !drag && a->cur >= 0 && (a->loc_l != last_l || a->loc_r != last_r || a->loop_on != last_loop)) {
+        last_l = a->loc_l; last_r = a->loc_r; last_loop = a->loop_on;
+        draw(a);
+    }
     /* the program's messages on the info line (the main window's) */
     if (vw && strcmp(last_info, a->info)) {
         snprintf(last_info, sizeof last_info, "%s", a->info);
@@ -827,6 +860,17 @@ static int menu_pick(App *a, int id)
     case M_DEMIXNOTE: demix_open(a, 1); break;
     case M_TRANSPOSE: jw_open_job(a, 0); break;
     case M_JOBS: jw_open(a); break;
+    case M_SETL: case M_SETR: case M_GOL: case M_GOR: case M_LOOP: {
+        uint32_t t = a->cur >= 0 ? xg_us_tick(&a->song, a->pos_us) : 0;
+        if (a->cur < 0) break;
+        if (id == M_SETL) a->loc_l = t;
+        else if (id == M_SETR) a->loc_r = t;
+        else if (id == M_GOL || id == M_GOR) a->locate_us = (long)xg_tick_us(&a->song, id == M_GOL ? a->loc_l : a->loc_r);
+        else a->loop_on = !a->loop_on;
+        tr_refresh(a);
+        draw(a);
+        break;
+    }
     }
     return 0;
 }
@@ -995,6 +1039,24 @@ int tv_handle(App *a)
                     }
                     if (a->cur < 0 && ib >= I_UNDO && ib != I_TRANSPORT && ib != I_MIXER) info("Load a song first: Open or Songs.");
                 }
+                break;
+            }
+            if (code == SELECTDOWN && my >= tb && my < gy0 && mx >= gx0 && mx <= gx1 && a->cur >= 0) {
+                /* the ruler: to the beat there (Shift: L there, Alt: R there) */
+                uint32_t t = tx(a, mx), bar, beat, tk;
+                char m[80];
+                ed_mbt(&a->ed, t, &bar, &beat, &tk);
+                t = ed_tick_of(&a->ed, bar, beat, 0);
+                if (qual & (IEQUALIFIER_LSHIFT | IEQUALIFIER_RSHIFT)) { a->loc_l = t; snprintf(m, sizeof m, "L = %lu:%lu", (unsigned long)bar, (unsigned long)beat); }
+                else if (qual & (IEQUALIFIER_LALT | IEQUALIFIER_RALT)) { a->loc_r = t; snprintf(m, sizeof m, "R = %lu:%lu", (unsigned long)bar, (unsigned long)beat); }
+                else {
+                    a->locate_us = (long)xg_tick_us(&a->song, t);
+                    a->pos_us = (uint32_t)a->locate_us;
+                    snprintf(m, sizeof m, "Position %lu:%lu  (Shift-click: L, Alt-click: R)", (unsigned long)bar, (unsigned long)beat);
+                }
+                info(m);
+                tr_refresh(a);
+                draw(a);
                 break;
             }
             if (code == SELECTDOWN && my >= gy0 && my <= gy1) {

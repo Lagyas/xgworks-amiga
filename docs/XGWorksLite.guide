@@ -242,7 +242,8 @@ blocks are made.
 
 The buttons @{b}Roll@{ub}, @{b}List@{ub}, @{b}Demix Ch...@{ub} and @{b}Demix Note...@{ub} work on the
 clicked track. The @{b}right mouse button@{ub} (held, menu in the screen title
-bar) is the Track menu too:
+bar) has the Locators menu (Set L / Set R at the position, Go to L / R,
+Loop on / off) and the Track menu too:
 Piano Roll, Event List, Staff, Drums, Lyrics / Karaoke, Mixer, XGM part
 editor, @{b}Demix by Channel...@{ub}, @{b}Demix by Note...@{ub}, Transpose..., Jobs...
 
@@ -253,6 +254,10 @@ editor, @{b}Demix by Channel...@{ub}, @{b}Demix by Note...@{ub}, Transpose..., J
                     after it); the selected track's channel is ticked
   Both work on the selected track or on all tracks; Undo takes it back.
 
+  click the ruler     the song position to that beat
+  Shift-click ruler   the L locator there, @{b}Alt-click@{ub}: the R locator there
+                      (L / R are the yellow lines in the ruler; with Loop on
+                      the yellow band between them is played again and again)
   click a block       select it (Shift adds); its name comes into Name
   drag a block        move it by bars, with its events
   double click        the Piano Roll of its track
