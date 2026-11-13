@@ -11,12 +11,13 @@
 
    @{" Introduction          " link Intro}
    @{" Starting              " link Start}
-   @{" The main window       " link Main_Window}
+   @{" Main window and Songs " link Main_Window}
    @{" The mixer             " link Mixer}
    @{" Effects               " link Effects}
    @{" XGM part editor       " link XGM}
    @{" Lyrics and chords     " link Lyrics}
    @{" Track View (blocks)   " link TrackView}
+   @{" Transport             " link Transport}
    @{" Tracks                " link Tracks}
    @{" Event List            " link Events}
    @{" Piano Roll            " link Roll}
@@ -59,7 +60,23 @@ program.
 @endnode
 
 @node Main_Window "The main window"
-The list shows the songs of the folder. A double click or @{b}Play@{ub} plays
+XGWorks Lite opens with the @{"Track View" link TrackView} as its main window (as the web /
+PC version) and the @{"Transport" link Transport} under it. Closing the Track View ends
+the program. On the Track View's toolbar every editor and function has its
+icon:
+
+  New, Open, Save, As..   a new song, open, save, save as (.MID / .XWS)
+  Songs     this window: the songs of the folder and the settings
+  Undo      the last change back
+  List, Roll, Staff, Drum   Event List, Piano Roll, notation, Drum editor
+            of the selected track
+  Mixer, XGM   the mixer, the sound / bank of the track's part
+  Lyric, LyrEd, Texts   karaoke, the lyrics editor, the lyrics / chord tools
+  Jobs      the Job menu (Transpose, Quantize, Demix ...)
+  Trans     the Transport window shown / hidden
+
+@{b}Songs@{ub} (this window, closing it only hides it): the list shows the songs
+of the folder. A double click or @{b}Play@{ub} plays
 the selected song, @{b}Stop@{ub} stops it, @{b}|<@{ub} and @{b}>|@{ub} go to the
 previous / next song. At the end of a song the next one starts.
 
@@ -95,7 +112,22 @@ previous / next song. At the end of a song the next one starts.
               version. The screen's front / back gadget leads to the
               Workbench. Workbench: the windows on the Workbench as before.
 
-Keys in the classic window: P or Space play, S stop, Help this guide, Esc quit.
+Keys in the Songs window: P or Space play, S stop, Help this guide, Esc
+closes it.
+@endnode
+
+@node Transport "Transport"
+As the PC / web version's Transport (XGworks' Control Panel):
+
+  the display   the position bar : beat : tick (big), the time, the tempo
+                (with the Tempo %) and the time signature, PLAY / STOP, LOOP
+  @{b}Top@{ub}           to the start of the song
+  @{b}-1 bar / +1 bar@{ub}  a bar back / forward
+  @{b}Stop / Play@{ub}   (Space too) Play goes on from the position
+  @{b}Loop@{ub}          plays from L to R again and again
+  @{b}L / R@{ub}         the locators: the bar (Return), @{b}Set@{ub} = the position now,
+                @{b}Go@{ub} = to the locator
+  @{b}Rec / Click@{ub}   recording and the metronome come with a later version
 @endnode
 
 @node Mixer "The mixer"

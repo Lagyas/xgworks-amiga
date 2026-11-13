@@ -10,7 +10,15 @@ XGWorksLite - the window
 ------------------------
   XGWorksLite [FOLDER] [CLASSIC]
 
-  The songs of a folder in a list (default: the last folder, else the
+  It opens with the Track View as its main window (as the web / PC
+  version) - its toolbar has an icon for every editor and function: New,
+  Open, Save, As.., Songs, Undo, List, Roll, Staff, Drum, Mixer, XGM,
+  Lyric, LyrEd, Texts, Jobs, Trans - and the Transport under it: the big
+  position / time display, tempo, signature, Top, -1 bar, +1 bar, Stop,
+  Play, Loop, the L / R locators (Set, Go). Closing the Track View ends the
+  program.
+
+  Songs (toolbar): the songs of a folder in a list (default: the last folder, else the
   Songs folder next to the program). Double click or Play plays, Stop stops,
   |< and >| go to the previous / next song; at the end of a song the next one
   starts. Open... picks a song, Folder... a folder.
