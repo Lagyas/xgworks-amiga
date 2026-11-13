@@ -30,6 +30,15 @@ static void writef(const char *n, const uint8_t *b, size_t sz)
 int main(int argc, char **argv)
 {
     int i, bad = 0;
+    {
+        /* no song yet (all zero): bars and ticks without a division by zero */
+        static EdSong empty;
+        uint32_t bar = 0, beat = 0, t = 0;
+        ed_mbt(&empty, 1000, &bar, &beat, &t);
+        printf("%s  empty song: tick 1000 = %lu:%lu:%lu, bar 5 = tick %lu\n", bar == 1 && beat == 3 ? "OK  " : "FAIL",
+               (unsigned long)bar, (unsigned long)beat, (unsigned long)t, (unsigned long)ed_tick_of(&empty, 5, 1, 0));
+        bad += !(bar == 1 && beat == 3);
+    }
     for (i = 1; i < argc; i++) {
         size_t sz, n, n2;
         uint8_t *b = readf(argv[i], &sz), *o, *o2 = NULL;

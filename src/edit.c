@@ -444,7 +444,8 @@ static int sigs_read(const EdSong *s, uint32_t *tk, uint32_t *num, uint32_t *bl,
 {
     int n = 0;
     uint32_t t, i;
-    tk[0] = 0; num[0] = 4; bl[0] = s->ppqn; n = 1;
+    /* an empty song (no ppqn yet): 480 */
+    tk[0] = 0; num[0] = 4; bl[0] = s->ppqn ? s->ppqn : 480; n = 1;
     for (t = 0; t < s->ntrk; t++)
         for (i = 0; i < s->trk[t].n; i++) {
             const EdEv *e = &s->trk[t].ev[i];
@@ -463,7 +464,7 @@ static int sigs_read(const EdSong *s, uint32_t *tk, uint32_t *num, uint32_t *bl,
                 }
                 tk[k] = e->tick;
                 num[k] = d[0] ? d[0] : 4;
-                bl[k] = (uint32_t)s->ppqn * 4 / den;
+                bl[k] = (uint32_t)(s->ppqn ? s->ppqn : 480) * 4 / den;
                 if (!bl[k]) bl[k] = 1;
             }
         }
