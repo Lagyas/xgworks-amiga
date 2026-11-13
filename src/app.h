@@ -46,7 +46,7 @@ typedef struct {
     uint32_t pos_us;       /* the song position shown */
     long locate_us;        /* a window asks to move the song position there (-1 = no) */
     int want_mixer;        /* a window asks for the mixer window */
-    int want_cmd;          /* a window asks the main loop for a command (CMD_...) */
+    int want_cmd;          /* a window asks the main loop for a command (APC_...) */
     int loop_on;           /* Transport: Loop from L to R */
     uint32_t loc_l, loc_r; /* the locators (ticks) */
 } App;
@@ -105,7 +105,7 @@ void app_time(char *out, uint32_t us);
 /* Settings in ENVARC:XGWorksLite.prefs (folder, reset, output, tempo). */
 void app_load_prefs(App *a);
 /* The commands the Track View / Transport ask the main loop for. */
-enum { CMD_NONE, CMD_NEW, CMD_OPEN, CMD_SAVE, CMD_SAVEAS, CMD_CLOSE, CMD_SONGS, CMD_PLAY, CMD_STOP, CMD_QUIT, CMD_FOLDER };
+enum { APC_NONE, APC_NEW, APC_OPEN, APC_SAVE, APC_SAVEAS, APC_CLOSE, APC_SONGS, APC_PLAY, APC_STOP, APC_QUIT, APC_FOLDER };
 /* The sound names after the song's standard (GS or XG); after Reset changes. */
 void app_names_std(App *a);
 void app_save_prefs(const App *a);

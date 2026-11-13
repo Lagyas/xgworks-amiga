@@ -306,8 +306,8 @@ static void button(App *a, int b)
     case B_TOP: locate_tick(a, 0); break;
     case B_BACK: if (a->cur >= 0) locate_tick(a, ed_tick_of(&a->ed, bar > 1 ? bar - 1 : 1, 1, 0)); break;
     case B_FWD: if (a->cur >= 0) locate_tick(a, ed_tick_of(&a->ed, bar + 1, 1, 0)); break;
-    case B_STOP: a->want_cmd = CMD_STOP; break;
-    case B_PLAY: a->want_cmd = CMD_PLAY; break;
+    case B_STOP: a->want_cmd = APC_STOP; break;
+    case B_PLAY: a->want_cmd = APC_PLAY; break;
     case B_LOOP:
         a->loop_on = !a->loop_on;
         if (a->loop_on && a->loc_r <= a->loc_l) snprintf(a->info, sizeof a->info, "Loop: set R after L.");
@@ -332,7 +332,7 @@ int tr_handle(App *a)
         case IDCMP_CLOSEWINDOW: close = 1; break;
         case IDCMP_REFRESHWINDOW: GT_BeginRefresh(tw); GT_EndRefresh(tw, TRUE); draw_all(a); break;
         case IDCMP_VANILLAKEY:
-            if (code == ' ') a->want_cmd = app_playing(a) ? CMD_STOP : CMD_PLAY;
+            if (code == ' ') a->want_cmd = app_playing(a) ? APC_STOP : APC_PLAY;
             break;
         case IDCMP_MOUSEBUTTONS:
             if (code == SELECTDOWN && my >= by0 && my < by0 + bh && mx >= bx0) {

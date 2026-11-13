@@ -848,7 +848,7 @@ int tv_handle(App *a)
         }
         GT_ReplyIMsg(m);
         switch (cls) {
-        case IDCMP_CLOSEWINDOW: a->want_cmd = CMD_QUIT; break;
+        case IDCMP_CLOSEWINDOW: a->want_cmd = APC_QUIT; break;
         case IDCMP_REFRESHWINDOW: GT_BeginRefresh(vw); GT_EndRefresh(vw, TRUE); draw(a); draw_toolbar(); break;
         case IDCMP_NEWSIZE: draw(a); draw_toolbar(); break;
         case IDCMP_MENUPICK: {
@@ -975,11 +975,11 @@ int tv_handle(App *a)
                     info(ITIP[ib]);
                     if (vtrk >= 0 && a->cur >= 0) edw_select_track(a, vtrk);
                     switch (ib) {
-                    case I_NEW: a->want_cmd = CMD_NEW; break;
-                    case I_OPEN: a->want_cmd = CMD_OPEN; break;
-                    case I_SAVE: a->want_cmd = CMD_SAVE; break;
-                    case I_SAVEAS: a->want_cmd = CMD_SAVEAS; break;
-                    case I_SONGS: a->want_cmd = CMD_SONGS; break;
+                    case I_NEW: a->want_cmd = APC_NEW; break;
+                    case I_OPEN: a->want_cmd = APC_OPEN; break;
+                    case I_SAVE: a->want_cmd = APC_SAVE; break;
+                    case I_SAVEAS: a->want_cmd = APC_SAVEAS; break;
+                    case I_SONGS: a->want_cmd = APC_SONGS; break;
                     case I_UNDO: if (a->cur >= 0) { app_undo(a); info(a->info); nsel = 0; changed = 1; } break;
                     case I_LIST: if (vtrk >= 0) menu_pick(a, M_LIST); else edw_tracks_open(a); break;
                     case I_ROLL: menu_pick(a, M_ROLL); break;

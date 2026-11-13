@@ -373,24 +373,24 @@ int gui_gadtools(App *a)
         if (a->want_cmd) {
             /* a command of the Track View / Transport */
             int cmd = a->want_cmd;
-            a->want_cmd = CMD_NONE;
+            a->want_cmd = APC_NONE;
             switch (cmd) {
-            case CMD_NEW: gadget(a, G_NEW, IDCMP_GADGETUP, 0, 0, 0); break;
-            case CMD_OPEN: gadget(a, G_OPEN, IDCMP_GADGETUP, 0, 0, 0); break;
-            case CMD_FOLDER: gadget(a, G_FOLDER, IDCMP_GADGETUP, 0, 0, 0); break;
-            case CMD_SAVEAS: gadget(a, G_SAVEAS, IDCMP_GADGETUP, 0, 0, 0); break;
-            case CMD_CLOSE: gadget(a, G_CLOSE, IDCMP_GADGETUP, 0, 0, 0); break;
-            case CMD_SAVE: if (a->cur >= 0) app_save(a); else snprintf(a->info, sizeof a->info, "No song to save."); show(a); break;
-            case CMD_SONGS: open_main(a); break;
-            case CMD_PLAY: {
+            case APC_NEW: gadget(a, G_NEW, IDCMP_GADGETUP, 0, 0, 0); break;
+            case APC_OPEN: gadget(a, G_OPEN, IDCMP_GADGETUP, 0, 0, 0); break;
+            case APC_FOLDER: gadget(a, G_FOLDER, IDCMP_GADGETUP, 0, 0, 0); break;
+            case APC_SAVEAS: gadget(a, G_SAVEAS, IDCMP_GADGETUP, 0, 0, 0); break;
+            case APC_CLOSE: gadget(a, G_CLOSE, IDCMP_GADGETUP, 0, 0, 0); break;
+            case APC_SAVE: if (a->cur >= 0) app_save(a); else snprintf(a->info, sizeof a->info, "No song to save."); show(a); break;
+            case APC_SONGS: open_main(a); break;
+            case APC_PLAY: {
                 int k = a->cur >= 0 ? a->cur : sel >= 0 ? sel : 0;
                 if (k < a->count) start(a, k, k == a->cur ? shown_pos : 0);
                 else snprintf(a->info, sizeof a->info, "No songs: Open or Songs.");
                 show(a);
                 break;
             }
-            case CMD_STOP: app_stop(a); show(a); break;
-            case CMD_QUIT: running = 0; break;
+            case APC_STOP: app_stop(a); show(a); break;
+            case APC_QUIT: running = 0; break;
             }
         }
         if (a->locate_us >= 0) {
@@ -436,7 +436,6 @@ int gui_gadtools(App *a)
             case IDCMP_MOUSEMOVE:
             case IDCMP_GADGETUP:
                 gadget(a, src->GadgetID, cls, code, secs, mics);
-                }
                 break;
             }
         }

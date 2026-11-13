@@ -199,8 +199,8 @@ int gui_mui(App *a)
             /* a command of the Track View / Transport */
             static const ULONG CMD_IDS[] = {0, ID_NEW, ID_OPEN, ID_SAVE, ID_SAVEAS, ID_CLOSE, ID_SONGS, ID_PLAYCUR, ID_STOP,
                                             MUIV_Application_ReturnID_Quit, ID_FOLDER};
-            id = a->want_cmd > 0 && a->want_cmd <= CMD_FOLDER ? CMD_IDS[a->want_cmd] : 0;
-            a->want_cmd = CMD_NONE;
+            id = a->want_cmd > 0 && a->want_cmd <= APC_FOLDER ? CMD_IDS[a->want_cmd] : 0;
+            a->want_cmd = APC_NONE;
         } else id = DoMethod(app, MUIM_Application_NewInput, (ULONG)&sigs);
         switch (id) {
         case ID_HIDE:
