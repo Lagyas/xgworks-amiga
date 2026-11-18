@@ -1,0 +1,42 @@
+XGWorks Lite in WinUAE playing an emulated Roland Sound Canvas (88emu)
+=====================================================================
+
+XGWorks Lite only sends MIDI. In WinUAE that MIDI can go to 88emuPlayer
+(The Usual Suspects, free, GPLv3) on the same PC, which runs the original
+SC-55 / SC-88 / SC-88Pro / SC-8850 firmware: the song plays live, in real
+time, with the sound of the real module.
+
+  Amiga (WinUAE)          Windows                      Windows
+  XGWorks Lite  --serial-->  loopMIDI port "Amiga"  -->  88emuPlayer --> sound
+  31250 baud               (virtual MIDI cable)          (SC-88Pro ...)
+
+1. Virtual MIDI cable (Windows 10 has none of its own)
+   Install loopMIDI (Tobias Erichsen) and add a port, e.g. "Amiga".
+
+2. 88emuPlayer
+   - Unpack the win64 zip, start 88emuPlayer.exe.
+   - Put your ROM images into Documents\The Usual Suspects\88emuPlayer
+     (e.g. roms\SC-88Pro); the device selector lists what is missing.
+   - Choose the device (SC-88Pro ...).
+   - Settings -> Audio: the output, buffer.
+   - Settings -> MIDI: next to the input "Amiga" click A (part group A).
+
+3. WinUAE
+   - Settings -> Hardware -> IO ports:
+       Serial port: any entry (not "none" - else the data is dropped),
+       MIDI Out:    "Amiga" (the loopMIDI port).
+     When the Amiga sets its serial port to 31250 baud, WinUAE sends the
+     serial data to MIDI Out.
+   - Save the configuration.
+
+4. XGWorks Lite
+   - Output: serial.device (31250 baud).
+   - Reset: GS (or the song's own) - the module starts each song clean.
+   - Play.
+
+A real Amiga: a serial MIDI interface on the Amiga, its MIDI OUT into a
+USB-MIDI interface of the PC, and that input with a part group in
+88emuPlayer (step 2).
+
+SC-88 / SC-88Pro have two MIDI inputs (32 parts): group B is the second;
+XGWorks Lite has one serial port, so one input (16 parts) is used.

@@ -28,6 +28,7 @@ typedef struct {
     int output;            /* 0 serial.device, 1 CAMD */
     char serdev[40];
     long unit;
+    char camdlink[32];     /* CAMD: the link (cluster) to send to, "out.0" */
     char info[160];        /* the status line */
     int autonext;          /* the next song after the end */
     Mixer mx;              /* the 16 parts of the loaded song */
@@ -94,6 +95,8 @@ int  app_undo(App *a);
 void app_track_mute(App *a);
 /* A note heard at once (on: velocity, 0 = off), e.g. while drawing notes. */
 void app_note(App *a, int ch, int key, int vel);
+/* The output settings changed (MIDI Setup, Songs): reopen at the next message, save. */
+void app_output_changed(App *a);
 /* How lyrics are written: plain letters, ISO-8859-2 or Latin-1 (rebuilds them). */
 void app_set_letters(App *a, int letters);
 void app_set_tempo(App *a, int pct);

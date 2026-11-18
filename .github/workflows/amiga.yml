@@ -40,6 +40,7 @@ jobs:
           printf 'Copy ws.ini, inst.ini and all the voice lists (*.ini) of your XGworks\nV4.0 XG4 folder here (and midi-file-editor.html for the SC-8850 GS\nnames): the sound and drum names then come from them.\n' > "out/XGWorks Lite/XG4/ReadMe"
           cp docs/ReadMe.txt "out/XGWorks Lite/ReadMe"
           cp docs/XGWorksLite.guide "out/XGWorks Lite/"
+          cp docs/WinUAE-88emu.txt "out/XGWorks Lite/"
           cd out && zip -r ../XGWorksLite-amiga.zip "XGWorks Lite"
       - uses: actions/upload-artifact@v4
         with:

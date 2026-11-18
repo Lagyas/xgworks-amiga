@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "trackview.h"
+#include "midisetup.h"
 #include "blocks.h"
 #include "edwin.h"
 #include "pianoroll.h"
@@ -78,7 +79,7 @@ static App *dm_app;
 
 /* the Track menu (the right mouse button), as the web / PC version's track menu */
 enum { M_ROLL = 1, M_LIST, M_STAFF, M_DRUMS, M_LYRICS, M_MIXER, M_XGM, M_DEMIXCH, M_DEMIXNOTE, M_TRANSPOSE, M_JOBS,
-       M_SETL, M_SETR, M_GOL, M_GOR, M_LOOP };
+       M_SETL, M_SETR, M_GOL, M_GOR, M_LOOP, M_MIDISETUP };
 static struct NewMenu nm[] = {
     {NM_TITLE, (STRPTR)"Track", NULL, 0, 0, NULL},
     {NM_ITEM, (STRPTR)"Piano Roll", (STRPTR)"R", 0, 0, (APTR)M_ROLL},
@@ -99,6 +100,8 @@ static struct NewMenu nm[] = {
     {NM_ITEM, (STRPTR)"Go to L", NULL, 0, 0, (APTR)M_GOL},
     {NM_ITEM, (STRPTR)"Go to R", NULL, 0, 0, (APTR)M_GOR},
     {NM_ITEM, (STRPTR)"Loop L - R on / off", (STRPTR)"O", 0, 0, (APTR)M_LOOP},
+    {NM_TITLE, (STRPTR)"Setup", NULL, 0, 0, NULL},
+    {NM_ITEM, (STRPTR)"MIDI Setup...", (STRPTR)"I", 0, 0, (APTR)M_MIDISETUP},
     {NM_END, NULL, NULL, 0, 0, NULL},
 };
 
@@ -145,11 +148,12 @@ static void cursor_xor(App *a);
 static UWORD CP(int c, UWORD def) { return pal(cmap[c], def); }
 
 /* ---- the toolbar: the editors and the functions as icons (as the PC / web main window) ---- */
-enum { I_NEW, I_OPEN, I_SAVE, I_SAVEAS, I_SONGS, I_UNDO, I_LIST, I_ROLL, I_STAFF, I_DRUM, I_MIXER, I_XGM, I_LYRICS, I_LYRED,
+enum { I_NEW, I_OPEN, I_SAVE, I_SAVEAS, I_SONGS, I_MIDI, I_UNDO, I_LIST, I_ROLL, I_STAFF, I_DRUM, I_MIXER, I_XGM, I_LYRICS, I_LYRED,
        I_TEXTS, I_JOBS, I_TRANSPORT, I_N };
-static const char *const ILABEL[I_N] = {"New", "Open", "Save", "As..", "Songs", "Undo", "List", "Roll", "Staff", "Drum", "Mixer",
+static const char *const ILABEL[I_N] = {"New", "Open", "Save", "As..", "Songs", "MIDI", "Undo", "List", "Roll", "Staff", "Drum", "Mixer",
                                         "XGM", "Lyric", "LyrEd", "Texts", "Jobs", "Trans"};
 static const char *const ITIP[I_N] = {"New song", "Open a song...", "Save the song", "Save as... (.MID / .XWS)", "Songs: the list, tempo, transpose, reset, output, screen",
+                                      "MIDI Setup: the MIDI output (serial.device / CAMD), device, unit, CAMD link",
                                       "Undo", "Event List of the selected track", "Piano Roll", "Staff (notation)", "Drum editor", "Mixer",
                                       "XGM: sound / bank of the track's part", "Lyrics / Karaoke", "Lyrics editor", "Texts: lyrics and chords tools",
                                       "Jobs: transpose, quantize, demix ...", "Transport: play, locators, loop"};
@@ -242,6 +246,16 @@ static void draw_icon(struct RastPort *rp, int id, WORD x, WORD y)
         SetAPen(rp, grey); RectFill(rp, x + 3, y + 1, x + 12, y + 5);
         SetAPen(rp, pal(PAL_K_HAT, pen_tx)); for (k = 0; k < 3; k++) line(rp, x + 7 + k, y + 5, x + 15 + k, y + 13);
         SetAPen(rp, black); box(rp, x + 3, y + 1, x + 12, y + 5);
+        break;
+    case I_MIDI:
+        /* a 5-pin DIN socket */
+        SetAPen(rp, black); RectFill(rp, x + 4, y + 1, x + 17, y + 12);
+        SetAPen(rp, grey); RectFill(rp, x + 6, y + 3, x + 15, y + 10);
+        SetAPen(rp, white);
+        RectFill(rp, x + 7, y + 6, x + 8, y + 7); RectFill(rp, x + 13, y + 6, x + 14, y + 7);
+        RectFill(rp, x + 8, y + 4, x + 9, y + 5); RectFill(rp, x + 12, y + 4, x + 13, y + 5);
+        RectFill(rp, x + 10, y + 4, x + 11, y + 5);
+        SetAPen(rp, black); RectFill(rp, x + 10, y + 9, x + 11, y + 10);
         break;
     case I_TRANSPORT:
         SetAPen(rp, black); RectFill(rp, x + 1, y + 1, x + 20, y + 12);
@@ -860,6 +874,7 @@ static int menu_pick(App *a, int id)
     case M_DEMIXNOTE: demix_open(a, 1); break;
     case M_TRANSPOSE: jw_open_job(a, 0); break;
     case M_JOBS: jw_open(a); break;
+    case M_MIDISETUP: ms_open(a); break;
     case M_SETL: case M_SETR: case M_GOL: case M_GOR: case M_LOOP: {
         uint32_t t = a->cur >= 0 ? xg_us_tick(&a->song, a->pos_us) : 0;
         if (a->cur < 0) break;
@@ -1024,6 +1039,7 @@ int tv_handle(App *a)
                     case I_SAVE: a->want_cmd = APC_SAVE; break;
                     case I_SAVEAS: a->want_cmd = APC_SAVEAS; break;
                     case I_SONGS: a->want_cmd = APC_SONGS; break;
+                    case I_MIDI: ms_open(a); break;
                     case I_UNDO: if (a->cur >= 0) { app_undo(a); info(a->info); nsel = 0; changed = 1; } break;
                     case I_LIST: if (vtrk >= 0) menu_pick(a, M_LIST); else edw_tracks_open(a); break;
                     case I_ROLL: menu_pick(a, M_ROLL); break;

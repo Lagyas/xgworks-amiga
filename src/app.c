@@ -101,6 +101,7 @@ int app_init(App *a, const char *folder)
     a->autonext = 1;
     a->kfont = 24;
     strcpy(a->serdev, "serial.device");
+    strcpy(a->camdlink, "out.0");
     strcpy(a->folder, "PROGDIR:Songs");
     if (!pl_init(&a->pl)) return 0;
     AslBase = OpenLibrary((CONST_STRPTR)"asl.library", 37);
@@ -113,6 +114,7 @@ int app_init(App *a, const char *folder)
         else snprintf(a->info, sizeof a->info, "No voice lists in PROGDIR:XG4 - GM names (see XG4/ReadMe).");
     }
     app_load_prefs(a);
+    mo_set_camd_link(a->camdlink);
     if (folder) {
         strncpy(a->folder, folder, sizeof a->folder - 1);
     }
@@ -151,6 +153,15 @@ static void send_now(App *a, const uint8_t *m)
     }
     mo_msg(m[0], m + 1, (uint32_t)n - 1);
     mo_flush();
+}
+
+void app_output_changed(App *a)
+{
+    out_close(a);
+    mo_set_camd_link(a->camdlink);
+    app_save_prefs(a);
+    if (app_playing(a)) snprintf(a->info, sizeof a->info, "MIDI output: taken at the next Play.");
+    else snprintf(a->info, sizeof a->info, "MIDI output: %s.", a->output == 1 ? a->camdlink : a->serdev);
 }
 
 void app_note(App *a, int ch, int key, int vel)
@@ -768,6 +779,7 @@ void app_load_prefs(App *a)
         else if (!strcmp(line, "output")) a->output = atoi(v) % OUTPUTS;
         else if (!strcmp(line, "device")) { strncpy(a->serdev, v, sizeof a->serdev - 1); }
         else if (!strcmp(line, "unit")) a->unit = atol(v);
+        else if (!strcmp(line, "camdlink") && *v) { strncpy(a->camdlink, v, sizeof a->camdlink - 1); }
         else if (!strcmp(line, "tempo")) app_set_tempo(a, atoi(v));
         else if (!strcmp(line, "letters")) a->letters = atoi(v) % 3;
         else if (!strcmp(line, "lyricsize")) a->kfont = atoi(v) < 8 ? 24 : atoi(v);
@@ -784,7 +796,7 @@ void app_save_prefs(const App *a)
     for (k = 0; k < 2; k++) {
         FILE *f = fopen(files[k], "w");
         if (!f) continue;
-        fprintf(f, "folder=%s\nreset=%d\noutput=%d\ndevice=%s\nunit=%ld\ntempo=%d\nletters=%d\nlyricsize=%d\nscreen=%d\nsounds=%d\n", a->folder, a->reset, a->output, a->serdev, a->unit, a->pl.tempo, a->letters, a->kfont, a->screen, a->std_user);
+        fprintf(f, "folder=%s\nreset=%d\noutput=%d\ndevice=%s\nunit=%ld\ncamdlink=%s\ntempo=%d\nletters=%d\nlyricsize=%d\nscreen=%d\nsounds=%d\n", a->folder, a->reset, a->output, a->serdev, a->unit, a->camdlink, a->pl.tempo, a->letters, a->kfont, a->screen, a->std_user);
         fclose(f);
     }
 }

@@ -10,6 +10,8 @@
  * (unit = its unit); 0 = failed (the message says why). */
 int  mo_open(const char *device, long unit, char *msg, int msglen);
 void mo_close(void);
+/* The CAMD link mo_open("camd") sends to ("" = out.<unit>). */
+void mo_set_camd_link(const char *link);
 /* One message: status + data (SysEx: status F0 / F7 + the data after it). */
 void mo_msg(uint8_t status, const uint8_t *data, uint32_t n);
 /* Send what is queued. */

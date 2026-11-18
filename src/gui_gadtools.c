@@ -30,6 +30,7 @@
 #include "jobwin.h"
 #include "trackview.h"
 #include "transport.h"
+#include "midisetup.h"
 #include "screen.h"
 
 struct Library *GadToolsBase;
@@ -251,6 +252,8 @@ static void gadget(App *a, int gid, ULONG cls, UWORD code, ULONG secs, ULONG mic
             break;
         case G_OUT:
             a->output = code;
+            app_output_changed(a);
+            ms_refresh(a);
             break;
         case G_SCREEN:
             a->screen = code;

@@ -12,11 +12,18 @@ XGWorksLite - the window
 
   It opens with the Track View as its main window (as the web / PC
   version) - its toolbar has an icon for every editor and function: New,
-  Open, Save, As.., Songs, Undo, List, Roll, Staff, Drum, Mixer, XGM,
+  Open, Save, As.., Songs, MIDI, Undo, List, Roll, Staff, Drum, Mixer, XGM,
   Lyric, LyrEd, Texts, Jobs, Trans - and the Transport under it: the big
   position / time display, tempo, signature, Top, -1 bar, +1 bar, Stop,
   Play, Loop, the L / R locators (Set, Go). Closing the Track View ends the
   program.
+
+  MIDI (toolbar), or the menu Setup - MIDI Setup... (Amiga+I): the MIDI
+  output - serial.device or CAMD -, the serial device and its unit (e.g.
+  duart.device 1), the CAMD link (out.0 ...), Test note (C4, channel 1),
+  WinUAE / 88emu (serial.device 0 for WinUAE's MIDI Out, see
+  WinUAE-88emu.txt), Default. Taken at once and saved. MIDI In comes with
+  recording.
 
   Songs (toolbar): the songs of a folder in a list (default: the last folder, else the
   Songs folder next to the program). Double click or Play plays, Stop stops,
@@ -29,6 +36,7 @@ XGWorksLite - the window
   Transpose  -12 .. +12 half-tones, every channel but the drums (10)
   Reset      Song's own / XG / GM / GS: a System On before the song
   Output     serial.device (31250 baud) or CAMD (camd.library, link out.0)
+             - the same as in the MIDI Setup window below
   Screen     Workbench / 16 / 32 / 256 colours: from the next start an own
              screen like the Workbench with these colours (as far as the
              display can: ECS 16, AGA / RTG 256), all the windows on it.

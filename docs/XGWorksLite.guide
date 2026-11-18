@@ -243,7 +243,7 @@ blocks are made.
 The buttons @{b}Roll@{ub}, @{b}List@{ub}, @{b}Demix Ch...@{ub} and @{b}Demix Note...@{ub} work on the
 clicked track. The @{b}right mouse button@{ub} (held, menu in the screen title
 bar) has the Locators menu (Set L / Set R at the position, Go to L / R,
-Loop on / off) and the Track menu too:
+Loop on / off), the Setup menu (MIDI Setup...) and the Track menu too:
 Piano Roll, Event List, Staff, Drums, Lyrics / Karaoke, Mixer, XGM part
 editor, @{b}Demix by Channel...@{ub}, @{b}Demix by Note...@{ub}, Transpose..., Jobs...
 
@@ -487,15 +487,32 @@ with another name chooses .XWS or MIDI by the name.
 @endnode
 
 @node Output "MIDI output"
+The @{b}MIDI Setup@{ub} window chooses it: the @{b}MIDI@{ub} icon in the Track View's
+toolbar (next to Songs), or the menu Setup - MIDI Setup... (Amiga+I).
+
+  @{b}MIDI Out@{ub}       serial.device (a serial MIDI interface) or CAMD
+  @{b}Serial device@{ub}  serial.device, or another one (e.g. duart.device,
+                 an extra serial card) and its @{b}Unit@{ub}
+  @{b}CAMD link@{ub}      the CAMD cluster to send to (default out.0; the
+                 names your CAMD driver shows, e.g. out.1)
+  @{b}MIDI In@{ub}        comes with recording (a later version)
+  @{b}Test note@{ub}      plays C4 on channel 1: is something heard?
+  @{b}WinUAE / 88emu@{ub} serial.device, unit 0 - for WinUAE's MIDI Out
+  @{b}Default@{ub}        the same, the start values
+
+A change is taken at once and saved; a song playing keeps its output until
+Stop. The Songs window's Output is the same setting.
+
 @{b}serial.device@{ub}: the Amiga's serial port at 31250 baud (MIDI) for the usual
-serial MIDI interfaces. Close other MIDI programs first. Another serial
-device and unit can be set in the settings file (device=, unit=).
+serial MIDI interfaces. Close other MIDI programs first.
 
-@{b}CAMD@{ub}: through camd.library (link out.0; unit= chooses out.<n>), for
-interfaces with a CAMD driver.
+@{b}CAMD@{ub}: through camd.library, for interfaces with a CAMD driver.
 
-In WinUAE / Amiga Forever: route the emulated serial port to a Windows MIDI
-output (IO ports, MIDI).
+@{b}WinUAE@{ub}: Settings - Hardware - IO ports: a Serial port (not "none") and
+MIDI Out = a Windows MIDI port. When the Amiga sets 31250 baud, WinUAE
+sends the serial data there. With loopMIDI and 88emuPlayer on the PC the
+song plays on an emulated Roland Sound Canvas (SC-55 ... SC-88Pro): see
+WinUAE-88emu.txt.
 @endnode
 
 @node XGPlay "XGPlay (Shell)"

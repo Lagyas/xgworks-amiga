@@ -22,6 +22,7 @@
 #include "jobwin.h"
 #include "trackview.h"
 #include "transport.h"
+#include "midisetup.h"
 #include "screen.h"
 
 struct Library *MUIMasterBase;
@@ -276,6 +277,8 @@ int gui_mui(App *a)
             break;
         case ID_OUT:
             a->output = (int)getv(cout, MUIA_Cycle_Active);
+            app_output_changed(a);
+            ms_refresh(a);
             break;
         case ID_SCREEN:
             a->screen = (int)getv(cscreen, MUIA_Cycle_Active);

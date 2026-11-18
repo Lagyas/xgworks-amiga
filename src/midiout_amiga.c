@@ -30,15 +30,24 @@ static struct timeval start;
 static UBYTE buf[512];
 static ULONG used;
 
+static char camd_link[32];
+
+void mo_set_camd_link(const char *link)
+{
+    strncpy(camd_link, link ? link : "", sizeof camd_link - 1);
+    camd_link[sizeof camd_link - 1] = 0;
+}
+
 static int open_camd(long unit, char *msg, int msglen)
 {
-    static char loc[16];
+    static char loc[40];
     struct TagItem t1[4], t2[3];
     if (!(CamdBase = OpenLibrary((CONST_STRPTR)"camd.library", 0))) {
         snprintf(msg, msglen, "camd.library is not installed");
         return 0;
     }
-    snprintf(loc, sizeof loc, "out.%ld", unit);
+    if (camd_link[0]) snprintf(loc, sizeof loc, "%s", camd_link);
+    else snprintf(loc, sizeof loc, "out.%ld", unit);
     t1[0].ti_Tag = MIDI_Name; t1[0].ti_Data = (ULONG)"XGWorks Lite";
     t1[1].ti_Tag = MIDI_MsgQueue; t1[1].ti_Data = 0;
     t1[2].ti_Tag = MIDI_SysExSize; t1[2].ti_Data = 0;

@@ -12,10 +12,11 @@
 #include "jobwin.h"
 #include "trackview.h"
 #include "transport.h"
+#include "midisetup.h"
 
 unsigned long eds_signal(void)
 {
-    return edw_signal() | pr_signal() | dw_signal() | lw_signal() | xw_signal() | yw_signal() | sw_signal() | jw_signal() | tv_signal() | tr_signal();
+    return edw_signal() | pr_signal() | dw_signal() | lw_signal() | xw_signal() | yw_signal() | sw_signal() | jw_signal() | tv_signal() | tr_signal() | ms_signal();
 }
 
 void eds_refresh(App *a)
@@ -29,6 +30,7 @@ void eds_refresh(App *a)
     sw_refresh(a);
     tv_refresh(a);
     tr_refresh(a);
+    ms_refresh(a);
 }
 
 void eds_position(App *a, uint32_t pos_us, int playing)
@@ -52,6 +54,7 @@ int eds_handle(App *a, unsigned long sigs)
     if (sigs & jw_signal()) ch |= jw_handle(a);
     if (sigs & tv_signal()) ch |= tv_handle(a);
     if (sigs & tr_signal()) tr_handle(a);
+    if (sigs & ms_signal()) ms_handle(a);
     if (ch) eds_refresh(a);
     return ch;
 }
@@ -68,4 +71,5 @@ void eds_close(void)
     jw_close();
     tv_close();
     tr_close();
+    ms_close();
 }
